@@ -144,6 +144,7 @@ export function ReceiptImportScreen({
               type="checkbox"
               className={styles.toggleTrack}
               checked={bankOnly}
+              onChange={() => setBankOnly((v) => !v)}
               aria-label="Bank-only mode"
             />
             <span className={styles.toggleTrack} />
