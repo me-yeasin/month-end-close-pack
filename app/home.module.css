@@ -308,6 +308,51 @@
 }
 
 /* --------------------------------------------------------------------- */
+/* Mobile drawer                                                         */
+/* --------------------------------------------------------------------- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  background: rgba(24, 36, 30, 0.44);
+  opacity: 0;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
+  transition: opacity 0.24s ease;
+}
+
+.scrimOpen {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawerClose {
+  position: absolute;
+  top: 16px;
+  right: 12px;
+  display: none;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.drawerClose:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.drawerClose svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* --------------------------------------------------------------------- */
 /* Main / topbar                                                         */
 /* --------------------------------------------------------------------- */
 
@@ -414,6 +459,31 @@
 .iconBtn svg {
   width: 16px;
   height: 16px;
+}
+
+.menuBtn {
+  display: none;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  margin-right: 2px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.menuBtn:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.menuBtn svg {
+  width: 18px;
+  height: 18px;
+  opacity: 1;
 }
 
 .monthBtn {
@@ -1440,7 +1510,7 @@
 /* Responsive                                                            */
 /* --------------------------------------------------------------------- */
 
-@media (max-width: 1180px) {
+@media (min-width: 721px) and (max-width: 1180px) {
   .sidebar {
     flex-basis: 82px;
     width: 82px;
@@ -1511,7 +1581,42 @@
 
 @media (max-width: 720px) {
   .sidebar {
-    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 70;
+    display: flex;
+    flex: 0 0 auto;
+    width: min(84vw, 302px);
+    height: 100vh;
+    height: 100dvh;
+    padding: 20px 16px 18px;
+    border-right: 1px solid var(--line);
+    border-radius: 0 18px 18px 0;
+    background: linear-gradient(180deg, #fffdf8 0%, #f8f4e9 100%);
+    box-shadow: 24px 0 64px -32px rgba(24, 36, 30, 0.6);
+    backdrop-filter: none;
+    transform: translateX(-102%);
+    visibility: hidden;
+    transition:
+      transform 0.28s cubic-bezier(0.32, 0.72, 0, 1),
+      visibility 0s linear 0.28s;
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    overflow: hidden;
+  }
+
+  .scrim {
+    display: block;
+  }
+
+  .menuBtn,
+  .drawerClose {
+    display: grid;
   }
 
   .main {
@@ -1598,6 +1703,13 @@
 
   .heroMeta {
     gap: 9px;
+  }
+}
+
+@media (max-width: 480px) {
+  .crumbSection,
+  .crumbChevron {
+    display: none;
   }
 }
 
