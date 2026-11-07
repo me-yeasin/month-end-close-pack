@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import styles from "./home.module.css";
 import { MobileMenuButton } from "./mobile-menu-button";
 import { Sidebar } from "./sidebar";
@@ -10,16 +9,20 @@ import { ReceiptReviewScreen } from "./receipt-review-screen";
 import { ExceptionsScreen } from "./exceptions-screen";
 import { MonthSummaryScreen } from "./summary-screen";
 import { ExportPackScreen } from "./export-screen";
+import { useUiStore } from "./ui-store";
+
+const VIEW_LABELS: Record<string, string> = {
+  overview: "Overview",
+  transactions: "Transactions",
+  receipts: "Receipts",
+  review: "Review",
+  summary: "Summary",
+  export: "Export",
+};
 
 export default function Home() {
-  const [view, setView] = useState<
-    | "overview"
-    | "transactions"
-    | "receipts"
-    | "review"
-    | "summary"
-    | "export"
-  >("overview");
+  const view = useUiStore((state) => state.view);
+  const setView = useUiStore((state) => state.setView);
 
   const goBack = () => setView("overview");
 
@@ -33,20 +36,24 @@ export default function Home() {
           <header className={styles.topbar}>
             <div className={styles.crumbs}>
               <MobileMenuButton />
-              <span className={styles.crumbSection}>Workspace</span>
-              <svg
-                className={styles.crumbChevron}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-              <strong>November 2026</strong>
+              <span className={styles.crumbSection}>November 2026</span>
+              {view !== "overview" && (
+                <>
+                  <svg
+                    className={styles.crumbChevron}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                  <strong>{VIEW_LABELS[view]}</strong>
+                </>
+              )}
             </div>
             <div className={styles.topActions}>
               <span className={styles.localPill}>
