@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  port: 5000,
   /* config options here */
   experimental: {
     agentFeedback: true,
@@ -11,6 +10,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     rules: {
       "*.css": {
+        // Keep CSS Modules on Turbopack's built-in pipeline. The Tailwind
+        // loader is only needed for global stylesheets like globals.css.
+        condition: { not: { path: /\.module\.css$/ } },
         loaders: ["@tailwindcss/turbopack"],
         as: "*.css",
       },
