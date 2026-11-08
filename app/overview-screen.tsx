@@ -227,6 +227,7 @@ export function OverviewScreen({
             {isProcessing ? (
               <button type="button" className={styles.btnSecondary} disabled>
                 <svg
+                  className={styles.spin}
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -351,29 +352,62 @@ export function OverviewScreen({
         <article className={`${styles.step} ${bankStepClass}`}>
           <div className={styles.stepTop}>
             <span className={styles.stepIco}>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.7}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M3 10 12 4l9 6" />
-                <path d="M5 10v9" />
-                <path d="M9 10v9" />
-                <path d="M15 10v9" />
-                <path d="M19 10v9" />
-                <path d="M3 21h18" />
-              </svg>
+              {isProcessing ? (
+                <svg
+                  className={styles.spin}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 12a9 9 0 1 1-6.2-8.5" />
+                </svg>
+              ) : (
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.7}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 10 12 4l9 6" />
+                  <path d="M5 10v9" />
+                  <path d="M9 10v9" />
+                  <path d="M15 10v9" />
+                  <path d="M19 10v9" />
+                  <path d="M3 21h18" />
+                </svg>
+              )}
             </span>
-            <span className={styles.stepStatus}>{bankStatus}</span>
+            <span className={styles.stepStatus}>
+              {isProcessing && (
+                <svg
+                  className={styles.spin}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.4}
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 12a9 9 0 1 1-6.2-8.5" />
+                </svg>
+              )}
+              {bankStatus}
+            </span>
           </div>
           <div className={styles.stepTitle}>Bank files</div>
           <div className={styles.stepSub}>{bankSub}</div>
           <div className={styles.stepBar}>
-            <span style={{ width: `${jobProgress}%` }} />
+            <span
+              className={isProcessing ? styles.stepBarBusy : undefined}
+              style={{ width: `${jobProgress}%` }}
+            />
           </div>
         </article>
 

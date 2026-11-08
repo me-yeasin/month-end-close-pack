@@ -2363,6 +2363,9 @@
 }
 
 .stepStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 3px 7px;
   border-radius: 999px;
   font-size: 9px;
@@ -2370,6 +2373,11 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.stepStatus svg {
+  width: 10px;
+  height: 10px;
 }
 
 .step.done .stepStatus {
@@ -2419,6 +2427,18 @@
 
 .step.active .stepBar span {
   background: linear-gradient(90deg, #e3a93b, #f0c877);
+}
+
+/* animated shimmer while an import is running */
+.stepBar span.stepBarBusy {
+  background-image: linear-gradient(90deg, #e3a93b, #f0c877, #e3a93b);
+  background-size: 200% 100%;
+  animation: barShift 1.1s linear infinite;
+}
+
+@keyframes barShift {
+  from { background-position: 0% 0; }
+  to   { background-position: -200% 0; }
 }
 
 .step.locked {
