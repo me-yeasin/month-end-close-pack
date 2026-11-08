@@ -8,6 +8,7 @@ import {
   IconPhoto,
   IconX,
   IconLock,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 import styles from "./home.module.css";
 
@@ -17,6 +18,11 @@ function formatBytes(bytes: number): string {
   const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
   const value = bytes / Math.pow(1024, i);
   return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+/** Stable identity for a file, so the same file is never added twice. */
+function fileKey(file: File): string {
+  return `${file.name}::${file.size}::${file.lastModified}`;
 }
 
 interface UploadSectionProps {
@@ -29,16 +35,19 @@ interface UploadSectionProps {
   files: File[];
   dragActive: boolean;
   setDragActive: (active: boolean) => void;
-  onPick: (files: FileList | null) => void;
+  /** Append already-filtered files (the parent de-duplicates). */
+  onAdd: (files: File[]) => void;
   onRemove: (index: number) => void;
+  /** Type guard applied to dropped/selected files (accept attr is picker-only). */
+  isAllowed: (file: File) => boolean;
   artClass: (file: File) => string;
   artIcon: (file: File) => React.ReactNode;
 }
 
 /**
  * One upload area (bank statements or receipts): heading + dropzone + the
- * list of files the user has chosen so far. Purely presentational — it does
- * not read or send file contents.
+ * list of files the user has chosen so far. Presentational only — it never
+ * reads or sends file contents.
  */
 function UploadSection({
   title,
@@ -50,14 +59,31 @@ function UploadSection({
   files,
   dragActive,
   setDragActive,
-  onPick,
+  onAdd,
   onRemove,
+  isAllowed,
   artClass,
   artIcon,
 }: UploadSectionProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  // Depth counter prevents the highlight flickering over child elements.
+  const dragDepth = useRef(0);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const openPicker = () => inputRef.current?.click();
+
+  const intake = (list: FileList | null) => {
+    if (!list || list.length === 0) return;
+    const incoming = Array.from(list);
+    const allowed = incoming.filter(isAllowed);
+    const skipped = incoming.length - allowed.length;
+    setNotice(
+      skipped > 0
+        ? `${skipped} file${skipped === 1 ? "" : "s"} skipped — unsupported type`
+        : null,
+    );
+    if (allowed.length > 0) onAdd(allowed);
+  };
 
   return (
     <section className={styles.afSection}>
@@ -67,6 +93,11 @@ function UploadSection({
           <span className={styles.afTitle}>{title}</span>
           <span className={styles.afSub}>{sub}</span>
         </span>
+        {files.length > 0 && (
+          <span className={styles.afCount}>
+            {files.length} file{files.length === 1 ? "" : "s"}
+          </span>
+        )}
       </div>
 
       <div
@@ -83,20 +114,23 @@ function UploadSection({
         }}
         onDragEnter={(e) => {
           e.preventDefault();
-          setDragActive(true);
+          dragDepth.current += 1;
+          if (dragDepth.current === 1) setDragActive(true);
         }}
         onDragOver={(e) => {
           e.preventDefault();
-          setDragActive(true);
+          e.dataTransfer.dropEffect = "copy";
         }}
         onDragLeave={(e) => {
           e.preventDefault();
-          setDragActive(false);
+          dragDepth.current = Math.max(0, dragDepth.current - 1);
+          if (dragDepth.current === 0) setDragActive(false);
         }}
         onDrop={(e) => {
           e.preventDefault();
+          dragDepth.current = 0;
           setDragActive(false);
-          onPick(e.dataTransfer.files);
+          intake(e.dataTransfer.files);
         }}
       >
         <span className={styles.dropZoneIcon}>
@@ -108,7 +142,7 @@ function UploadSection({
           <span className={styles.btnGhostSmall}>Choose files</span>
         </span>
         <span className={styles.dropZoneHint}>
-          Accepted: <strong>{acceptLabel}</strong>
+          Accepted: <strong>{acceptLabel}</strong> · multiple allowed
         </span>
         <input
           ref={inputRef}
@@ -117,16 +151,23 @@ function UploadSection({
           multiple
           hidden
           onChange={(e) => {
-            onPick(e.target.files);
+            intake(e.target.files);
             e.target.value = "";
           }}
         />
       </div>
 
+      {notice && (
+        <span className={styles.afNotice}>
+          <IconAlertTriangle size={13} stroke={1.8} />
+          {notice}
+        </span>
+      )}
+
       {files.length > 0 && (
-        <div className={styles.fileList}>
+        <div className={`${styles.fileList} ${styles.thinScroll}`}>
           {files.map((file, i) => (
-            <div key={`${file.name}-${i}`} className={styles.fileItem}>
+            <div key={fileKey(file)} className={styles.fileItem}>
               <span className={`${styles.fileArt} ${artClass(file)}`}>
                 {artIcon(file)}
               </span>
@@ -142,6 +183,7 @@ function UploadSection({
                   className={`${styles.fileActionBtn} ${styles.danger}`}
                   onClick={() => onRemove(i)}
                   aria-label={`Remove ${file.name}`}
+                  title="Remove file"
                 >
                   <IconX size={14} stroke={2} />
                 </button>
@@ -188,17 +230,40 @@ export function AddFilesModal({
 
   if (!open) return null;
 
-  const add = (setter: React.Dispatch<React.SetStateAction<File[]>>) => (
-    list: FileList | null,
+  // Append while ignoring any file that is already in the list.
+  const addFiles = (setter: React.Dispatch<React.SetStateAction<File[]>>) => (
+    incoming: File[],
   ) => {
-    if (!list || list.length === 0) return;
-    setter((prev) => [...prev, ...Array.from(list)]);
+    if (incoming.length === 0) return;
+    setter((prev) => {
+      const seen = new Set(prev.map(fileKey));
+      const next = [...prev];
+      for (const file of incoming) {
+        const key = fileKey(file);
+        if (!seen.has(key)) {
+          seen.add(key);
+          next.push(file);
+        }
+      }
+      return next;
+    });
   };
-  const remove = (setter: React.Dispatch<React.SetStateAction<File[]>>) => (
+
+  const removeAt = (setter: React.Dispatch<React.SetStateAction<File[]>>) => (
     index: number,
   ) => setter((prev) => prev.filter((_, i) => i !== index));
 
-  const hasFiles = bankFiles.length > 0 || receiptFiles.length > 0;
+  const totalCount = bankFiles.length + receiptFiles.length;
+
+  const isCsv = (file: File) =>
+    file.name.toLowerCase().endsWith(".csv") ||
+    file.type === "text/csv" ||
+    file.type === "application/vnd.ms-excel";
+
+  const isReceipt = (file: File) =>
+    file.type === "application/pdf" ||
+    file.type.startsWith("image/") ||
+    file.name.toLowerCase().endsWith(".pdf");
 
   return (
     <div
@@ -232,7 +297,7 @@ export function AddFilesModal({
           read them on this device and prepare the pack for your review.
         </p>
 
-        <div className={styles.afBody}>
+        <div className={`${styles.afBody} ${styles.thinScroll}`}>
           <UploadSection
             title="Bank statements"
             sub="CSV exports from your bank"
@@ -242,8 +307,9 @@ export function AddFilesModal({
             files={bankFiles}
             dragActive={bankDrag}
             setDragActive={setBankDrag}
-            onPick={add(setBankFiles)}
-            onRemove={remove(setBankFiles)}
+            onAdd={addFiles(setBankFiles)}
+            onRemove={removeAt(setBankFiles)}
+            isAllowed={isCsv}
             artClass={() => styles.csv ?? ""}
             artIcon={() => <IconFileText size={17} stroke={1.8} />}
           />
@@ -258,8 +324,9 @@ export function AddFilesModal({
             files={receiptFiles}
             dragActive={receiptDrag}
             setDragActive={setReceiptDrag}
-            onPick={add(setReceiptFiles)}
-            onRemove={remove(setReceiptFiles)}
+            onAdd={addFiles(setReceiptFiles)}
+            onRemove={removeAt(setReceiptFiles)}
+            isAllowed={isReceipt}
             artClass={(f) =>
               f.type === "application/pdf" ? styles.pdf ?? "" : styles.image ?? ""
             }
@@ -289,9 +356,11 @@ export function AddFilesModal({
             type="button"
             className={styles.btnPrimary}
             onClick={onClose}
-            disabled={!hasFiles}
+            disabled={totalCount === 0}
           >
-            Add files
+            {totalCount === 0
+              ? "Add files"
+              : `Add ${totalCount} file${totalCount === 1 ? "" : "s"}`}
           </button>
         </div>
       </div>

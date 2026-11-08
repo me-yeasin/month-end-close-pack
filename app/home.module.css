@@ -501,6 +501,11 @@
 
 .afModal {
   max-width: 820px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow: hidden;
 }
 
 .afHeader {
@@ -519,6 +524,56 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 18px;
+  /* Only the body scrolls; header/note/footer stay pinned. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+/* Keep the modal chrome fixed so the actions are always reachable. */
+.afModal > .afHeader,
+.afModal > .afIntro,
+.afModal > .afNote,
+.afModal > .modalActions {
+  flex: 0 0 auto;
+}
+
+/* Add-files file list. Scoped with .afModal so it beats the global
+   `.shell .fileList` rule (same specificity, defined later in the file). */
+.afModal .afSection .fileList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Thin, unobtrusive scrollbar for scrollable panels */
+.thinScroll {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.thinScroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.thinScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinScroll::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+
+.thinScroll::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }
 
 /* Wider dialog with the two upload areas side-by-side on desktop */
@@ -527,6 +582,75 @@
     grid-template-columns: 1fr 1fr;
     gap: 22px;
     align-items: start;
+  }
+}
+
+/* Mobile: app-drawer style square tiles for selected files */
+@media (max-width: 720px) {
+  .afModal .afSection .fileList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 8px;
+  }
+
+  .afModal .afSection .fileItem {
+    position: relative;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 14px 8px 8px;
+    aspect-ratio: 1 / 1;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .afModal .afSection .fileArt {
+    width: 30px;
+    height: 30px;
+  }
+
+  .afModal .afSection .fileArt svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .afModal .afSection .fileInfo {
+    flex: 0 1 auto;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+  }
+
+  .afModal .afSection .fileName {
+    display: block;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    font-size: 11px;
+  }
+
+  .afModal .afSection .fileMeta {
+    display: none;
+  }
+
+  .afModal .afSection .fileActions {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+  }
+
+  .afModal .afSection .fileActionBtn {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+  }
+
+  .afModal .afSection .fileActionBtn svg {
+    width: 12px;
+    height: 12px;
   }
 }
 
@@ -582,6 +706,34 @@
 .afSub {
   color: var(--muted);
   font-size: 11.5px;
+}
+
+.afCount {
+  margin-left: auto;
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.afNotice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--amber-ink);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.afNotice svg {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
 }
 
 .afNote {
