@@ -41,6 +41,8 @@ type UiState = {
   addWorkspace: (ws: Workspace) => void;
   /** Switch the active workspace */
   switchWorkspace: (id: string) => void;
+  /** Remove a workspace by id; optionally pass the new active id */
+  removeWorkspace: (id: string, newActiveId: string | null) => void;
 };
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -79,5 +81,17 @@ export const useUiStore = create<UiState>((set, get) => ({
   switchWorkspace: (id) => {
     const ws = get().workspaces.find((w) => w.id === id) ?? null;
     set({ activeWorkspaceId: id, workspace: ws });
+  },
+
+  removeWorkspace: (id, newActiveId) => {
+    set((state) => {
+      const workspaces = state.workspaces.filter((w) => w.id !== id);
+      const active = workspaces.find((w) => w.id === newActiveId) ?? workspaces[0] ?? null;
+      return {
+        workspaces,
+        activeWorkspaceId: active?.id ?? null,
+        workspace: active,
+      };
+    });
   },
 }));

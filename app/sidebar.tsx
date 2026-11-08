@@ -6,6 +6,7 @@ import { useUiStore, type View, type Currency, type VatStatus } from "./ui-store
 import {
   createWorkspace as dbCreateWorkspace,
   setActiveWorkspace as dbSetActive,
+  deleteWorkspace as dbDeleteWorkspace,
 } from "./workspace-store";
 
 type NavItem = {
@@ -94,12 +95,17 @@ export function Sidebar() {
   const workspaces = useUiStore((state) => state.workspaces);
   const switchWorkspace = useUiStore((state) => state.switchWorkspace);
   const addWorkspace = useUiStore((state) => state.addWorkspace);
+  const removeWorkspace = useUiStore((state) => state.removeWorkspace);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
 
   // workspace picker state
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+
+  // delete confirmation state
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // new workspace modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -153,9 +159,24 @@ export function Sidebar() {
   };
 
   const handleSwitchWorkspace = async (id: string) => {
+    setConfirmDeleteId(null);
     setPickerOpen(false);
     switchWorkspace(id);
     await dbSetActive(id);
+  };
+
+  const handleDeleteWorkspace = async (id: string) => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const newActiveId = await dbDeleteWorkspace(id);
+      removeWorkspace(id, newActiveId);
+      setConfirmDeleteId(null);
+      // If all workspaces gone (shouldn't happen with guard, but safe)
+      if (!newActiveId) setPickerOpen(false);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   useEffect(() => {
@@ -297,22 +318,73 @@ export function Sidebar() {
             {pickerOpen && (
               <div className={styles.wsPopover} role="listbox">
                 {workspaces.map((ws) => (
-                  <button
-                    key={ws.id}
-                    type="button"
-                    role="option"
-                    aria-selected={ws.id === workspace?.id}
-                    className={`${styles.wsPopoverItem} ${ws.id === workspace?.id ? styles.wsActive : ""}`}
-                    onClick={() => handleSwitchWorkspace(ws.id)}
-                  >
-                    <span className={styles.wsPopoverDot} />
-                    <span>{ws.name}</span>
-                    {ws.id === workspace?.id && (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 12, height: 12, marginLeft: "auto", flexShrink: 0 }}>
-                        <path d="m5 12 5 5L20 7" />
-                      </svg>
+                  <div key={ws.id} className={styles.wsPopoverRow}>
+                    {confirmDeleteId === ws.id ? (
+                      /* inline confirmation */
+                      <div className={styles.wsConfirmRow}>
+                        <span className={styles.wsConfirmMsg}>
+                          Delete &ldquo;{ws.name}&rdquo;?
+                        </span>
+                        <div className={styles.wsConfirmActions}>
+                          <button
+                            type="button"
+                            className={styles.wsConfirmCancel}
+                            onClick={() => setConfirmDeleteId(null)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.wsConfirmDelete}
+                            disabled={deleting}
+                            onClick={() => handleDeleteWorkspace(ws.id)}
+                          >
+                            {deleting ? "Deleting…" : "Delete"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={ws.id === workspace?.id}
+                          className={`${styles.wsPopoverItem} ${ws.id === workspace?.id ? styles.wsActive : ""}`}
+                          onClick={() => handleSwitchWorkspace(ws.id)}
+                        >
+                          <span className={styles.wsPopoverDot} />
+                          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {ws.name}
+                          </span>
+                          {ws.id === workspace?.id && (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 12, height: 12, flexShrink: 0 }}>
+                              <path d="m5 12 5 5L20 7" />
+                            </svg>
+                          )}
+                        </button>
+                        {/* delete button — hidden until row is hovered, disabled if only 1 workspace */}
+                        <button
+                          type="button"
+                          className={styles.wsDeleteBtn}
+                          disabled={workspaces.length <= 1}
+                          aria-label={`Delete workspace ${ws.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmDeleteId(ws.id);
+                          }}
+                          title={workspaces.length <= 1 ? "Cannot delete the only workspace" : `Delete "${ws.name}"`}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M3 6h18" />
+                            <path d="M8 6V4h8v2" />
+                            <path d="M19 6l-1 14H6L5 6" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                          </svg>
+                        </button>
+                      </>
                     )}
-                  </button>
+                  </div>
                 ))}
                 <div className={styles.wsPopoverDivider} />
                 <button
