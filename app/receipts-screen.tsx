@@ -6,8 +6,6 @@ import {
   IconPhoto,
   IconFileTypePdf,
   IconFileX,
-  IconCheck,
-  IconAlertTriangle,
   IconRefresh,
   IconPlus,
   IconCloudOff,
@@ -15,7 +13,7 @@ import {
 import styles from "./home.module.css";
 import { useUiStore } from "./ui-store";
 
-interface ReceiptFile {
+export interface ReceiptFile {
   id: string;
   name: string;
   type: "image" | "pdf";
@@ -29,7 +27,7 @@ interface ReceiptFile {
 
 const STATUS_META: Record<
   ReceiptFile["status"],
-  { label: string; cls: string; desc: string }
+  { label: string; cls: string; desc: string; busy?: boolean }
 > = {
   queued: {
     label: "Queued",
@@ -38,8 +36,9 @@ const STATUS_META: Record<
   },
   processing: {
     label: "Reading",
-    cls: styles.neutral,
-    desc: "OCR in progress",
+    cls: styles.info,
+    desc: "OCR in progress — runs locally",
+    busy: true,
   },
   extracted: {
     label: "Extracted",
@@ -80,6 +79,8 @@ export function ReceiptImportScreen({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const accepted = ALLOWED.join(",");
+  const hasFiles = receipts.length > 0;
+  const isProcessing = receipts.some((r) => r.status === "processing");
 
   const handleFiles = useCallback(
     (fileList: FileList | null) => {
@@ -90,26 +91,22 @@ export function ReceiptImportScreen({
     [onUpload],
   );
 
-  const onDrag = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.type === "dragenter" || e.type === "dragover") {
-        setDragActive(true);
-      } else {
-        setDragActive(false);
-      }
-    },
-    [],
-  );
+  const onDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else {
+      setDragActive(false);
+    }
+  }, []);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
       setDragActive(false);
-      const files = e.dataTransfer.files;
-      handleFiles(files);
+      handleFiles(e.dataTransfer.files);
     },
     [handleFiles],
   );
@@ -123,18 +120,61 @@ export function ReceiptImportScreen({
     failed: receipts.filter((r) => r.status === "failed").length,
     dupes: receipts.filter((r) => r.duplicate).length,
   };
+  const readPct =
+    counts.total === 0
+      ? 0
+      : Math.round(((counts.extracted + counts.review) / counts.total) * 100);
 
-  const doneCount = counts.extracted + counts.review;
-  const progressPct =
-    counts.total === 0 ? 0 : Math.round(((counts.extracted + counts.review + counts.processing) / counts.total) * 100);
+  // hero copy — same tone as overview / summary / export
+  let heroTitle: React.ReactNode;
+  let heroText: string;
+  if (isProcessing) {
+    heroTitle = (
+      <>
+        Reading your <em>receipts…</em>
+      </>
+    );
+    heroText = `${counts.total - counts.queued} of ${counts.total} processed. OCR runs locally on this device — nothing is uploaded.`;
+  } else if (counts.review > 0) {
+    heroTitle = (
+      <>
+        {counts.review} receipt{counts.review === 1 ? "" : "s"} need a{" "}
+        <em>quick look.</em>
+      </>
+    );
+    heroText = `Some fields came back with low confidence. Check them against the file before the pack is built.`;
+  } else if (counts.failed > 0) {
+    heroTitle = (
+      <>
+        {counts.failed} receipt{counts.failed === 1 ? "" : "s"}{" "}
+        <em>failed to read.</em>
+      </>
+    );
+    heroText = `Retake the photo or try a clearer scan, then retry those files.`;
+  } else if (hasFiles) {
+    heroTitle = (
+      <>
+        Receipts are <em>ready.</em>
+      </>
+    );
+    heroText = `All ${counts.total} receipt${counts.total === 1 ? "" : "s"} read. Extracted fields will match back to your bank transactions.`;
+  } else {
+    heroTitle = (
+      <>
+        Start with your <em>receipts.</em>
+      </>
+    );
+    heroText =
+      "Drop in this month's receipts — we read them locally, extract vendor, date and total, then match them to your bank transactions.";
+  }
 
   return (
     <div className={styles.screen}>
-      {/* header */}
+      {/* ------------------------------ header ------------------------------ */}
       <div className={styles.sectionHead}>
         <div className={styles.sectionTitle}>
           <span className={styles.sectionEyebrow}>Receipts</span>
-          <h2 className={styles.sectionH2}>Upload receipts</h2>
+          <h2 className={styles.sectionH2}>Receipt queue</h2>
         </div>
         <div className={styles.sectionActions}>
           <button
@@ -143,58 +183,218 @@ export function ReceiptImportScreen({
             onClick={() => setBankOnly(!bankOnly)}
             role="switch"
             aria-checked={bankOnly}
-            aria-label="Bank-only mode"
+            aria-label="Bank-only mode — skip receipts this month"
           >
             <span className={styles.toggleTrack}>
               <span className={styles.toggleKnob} />
             </span>
-            <span style={{ marginRight: 6, display: "inline-flex" }}>
-              <IconCloudOff size={13} stroke={1.8} />
-            </span>
+            <IconCloudOff size={13} stroke={1.8} />
             <span>Bank-only mode</span>
           </button>
         </div>
       </div>
 
-      {/* bank-only callout */}
-      {bankOnly && (
-        <div className={styles.callout} style={{ margin: "-12px -12px 4px" }}>
-          <span className={`${styles.calloutIcon} ${styles.exIcon} ${styles.blue}`}>
-            <IconCloudOff size={15} stroke={1.8} />
-          </span>
-          <div>
-            <strong>No receipts this month</strong>
-            <p style={{ margin: "5px 0 0", color: "inherit" }}>
-              You can still build the pack from your bank files. Receipts can be
-              added later and matched back to these transactions.
-            </p>
+      {/* ------------------------------ hero ------------------------------ */}
+      <section className={styles.hero} aria-labelledby="receipts-title">
+        <div className={styles.heroCopy}>
+          <div className={styles.heroEyebrow}>
+            <i aria-hidden="true" />
+            Receipt queue
           </div>
-          <button
-            type="button"
-            className={`${styles.btnGhostSmall} ${styles.sm}`}
-            style={{ marginLeft: "auto", flexShrink: 0 }}
-            onClick={() => setBankOnly(false)}
-          >
-            Add receipts
-          </button>
+          <h1 id="receipts-title">{heroTitle}</h1>
+          <p>{heroText}</p>
+          <div className={styles.heroActions}>
+            {!hasFiles ? (
+              <>
+                <button
+                  type="button"
+                  className={`${styles.btnPrimary} ${styles.btnAmber}`}
+                  onClick={() => inputRef.current?.click()}
+                >
+                  <IconUpload size={15} stroke={2} />
+                  Browse files
+                </button>
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  onClick={() => setBankOnly(true)}
+                >
+                  <IconCloudOff size={15} stroke={1.8} />
+                  Skip receipts
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
+
+        {hasFiles ? (
+          <div
+            className={styles.heroRing}
+            role="img"
+            aria-label={`${readPct}% of receipts read`}
+          >
+            <svg className={styles.ring} viewBox="0 0 140 140" aria-hidden="true">
+              <defs>
+                <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stopColor="#F5EFDD" />
+                  <stop offset="0.55" stopColor="#F0C877" />
+                  <stop offset="1" stopColor="#E7B24A" />
+                </linearGradient>
+              </defs>
+              <circle className={styles.ringTrack} cx="70" cy="70" r="56" />
+              <circle
+                className={styles.ringValue}
+                cx="70"
+                cy="70"
+                r="56"
+                style={{ strokeDasharray: `${(readPct / 100) * 351.9} 351.9` }}
+              />
+            </svg>
+            <div className={styles.ringLabel}>
+              <strong>
+                {readPct}
+                <span>%</span>
+              </strong>
+              <span>read</span>
+            </div>
+          </div>
+        ) : (
+          <div className={styles.heroEmpty} aria-hidden="true">
+            <span className={styles.heroEmptyRing}>
+              <IconPhoto size={30} stroke={1.5} />
+            </span>
+            <span className={styles.heroEmptyLabel}>No receipts yet</span>
+          </div>
+        )}
+      </section>
+
+      {/* ------------------------------ drop zone (zero state) ------------------------------ */}
+      {!hasFiles && (
+        <>
+          <div
+            className={`${styles.dropZone} ${dragActive ? styles.dragover : ""} ${
+              receipts.length >= MAX_FILES ? styles.disabled : ""
+            }`}
+            onDragEnter={onDrag}
+            onDragLeave={onDrag}
+            onDragOver={onDrag}
+            onDrop={onDrop}
+            onClick={() => inputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                inputRef.current?.click();
+              }
+            }}
+            aria-label="Upload receipt images or PDFs"
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              accept={accepted}
+              multiple
+              className="sr-only"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+            <div className={styles.dropZoneIcon}>
+              <IconUpload size={22} stroke={1.8} />
+            </div>
+            <div>
+              <div className={styles.dropZoneTitle}>
+                Drag receipts here, or choose files
+              </div>
+              <div className={styles.dropZoneDesc}>
+                JPG, PNG or PDF — including multi-page PDFs. One or many at a
+                time.
+              </div>
+            </div>
+            <div className={styles.dropZoneActions}>
+              <button
+                type="button"
+                className={`${styles.btnSecondary} ${styles.sm}`}
+                tabIndex={-1}
+              >
+                Browse files
+              </button>
+            </div>
+          </div>
+          <p className={styles.sumNote}>
+            Receipts are read locally by on-device OCR. Nothing is uploaded —
+            extracted fields stay on this device until you export the pack.
+          </p>
+        </>
       )}
 
-      {/* drop zone */}
-      {!bankOnly && (
-        <div
-          className={`${styles.dropZone} ${dragActive ? styles.dragover : ""} ${
-            receipts.length >= MAX_FILES ? styles.disabled : ""
-          }`}
-          onDragEnter={onDrag}
-          onDragLeave={onDrag}
-          onDragOver={onDrag}
-          onDrop={onDrop}
-          onClick={() => inputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          aria-label="Upload receipt images or PDFs"
-        >
+      {/* ------------------------------ stats strip ------------------------------ */}
+      {hasFiles && (
+        <section className={styles.sumTotals} aria-label="Queue at a glance">
+          <div className={styles.sumTotal}>
+            <span className={styles.sumTotalLabel}>Files</span>
+            <strong className={styles.sumTotalValue}>{counts.total}</strong>
+          </div>
+          <div className={styles.sumTotal}>
+            <span className={styles.sumTotalLabel}>Read</span>
+            <strong className={`${styles.sumTotalValue} ${styles.sumTotalIn}`}>
+              {counts.extracted}
+            </strong>
+          </div>
+          <div className={styles.sumTotal}>
+            <span className={styles.sumTotalLabel}>Needs review</span>
+            <strong
+              className={`${styles.sumTotalValue} ${
+                counts.review > 0 ? styles.sumTotalWarn : styles.sumTotalNet
+              }`}
+            >
+              {counts.review}
+            </strong>
+          </div>
+        </section>
+      )}
+
+      {/* ------------------------------ queue ------------------------------ */}
+      {hasFiles && (
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <div className={styles.sectionTitle}>
+              <span className={styles.sectionEyebrow}>
+                {counts.queued + counts.processing > 0
+                  ? "In progress"
+                  : "Completed"}
+              </span>
+              <h2 className={styles.sectionH2}>
+                {counts.total} file{counts.total !== 1 ? "s" : ""}
+                {counts.failed > 0 && ` · ${counts.failed} failed`}
+                {counts.dupes > 0 && ` · ${counts.dupes} duplicate${counts.dupes !== 1 ? "s" : ""}`}
+              </h2>
+            </div>
+            <div className={styles.sectionActions}>
+              <button
+                type="button"
+                className={styles.btnGhostSmall}
+                onClick={() => onUpload?.([])}
+              >
+                Clear queue
+              </button>
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                onClick={() => inputRef.current?.click()}
+                disabled={receipts.length >= MAX_FILES}
+                title={
+                  receipts.length >= MAX_FILES
+                    ? `Limit reached: ${MAX_FILES} files`
+                    : "Add more receipts"
+                }
+              >
+                <IconPlus size={14} stroke={1.8} />
+                Add more
+              </button>
+            </div>
+          </div>
+
+          {/* hidden input also available in the data state */}
           <input
             ref={inputRef}
             type="file"
@@ -203,158 +403,18 @@ export function ReceiptImportScreen({
             className="sr-only"
             onChange={(e) => handleFiles(e.target.files)}
           />
-          <div className={styles.dropZoneIcon}>
-            <IconUpload size={22} stroke={1.8} />
-          </div>
-          <div>
-            <div className={styles.dropZoneTitle}>
-              Drag receipts here, or choose files
-            </div>
-            <div className={styles.dropZoneDesc}>
-              JPG, PNG, or PDF — including multi-page PDFs. One or many at a
-              time.
-            </div>
-          </div>
-          <div className={styles.dropZoneActions}>
-            <button
-              type="button"
-              className={`${styles.btnSecondary} ${styles.sm}`}
-            >
-              Browse files
-            </button>
-            <span className={styles.dropZoneHint}>
-              or <strong>select a folder</strong>
-            </span>
-          </div>
-          {receipts.length >= MAX_FILES && (
-            <div className={styles.dropZoneHint} style={{ color: "var(--red-ink)" }}>
-              Limit reached: {MAX_FILES} files
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* empty state */}
-      {receipts.length === 0 && !bankOnly && (
-        <div className={styles.empty}>
-          <div className={styles.emptyIcon}>
-            <IconPhoto size={22} stroke={1.8} />
-          </div>
-          <div className={styles.emptyTitle}>No receipts yet</div>
-          <div className={styles.emptyDesc}>
-            Upload your receipts next. If you do not have any, switch on bank-only
-            mode and the app will continue with your bank transactions only.
-          </div>
-          <div className={styles.emptyActions}>
-            <button
-              type="button"
-              className={`${styles.btnSecondary} ${styles.sm}`}
-              onClick={() => inputRef.current?.click()}
-            >
-              <IconUpload size={14} stroke={1.8} />
-              Choose files
-            </button>
-            <button
-              type="button"
-              className={`${styles.btnPrimary} ${styles.sm}`}
-            >
-              <IconCloudOff size={14} stroke={1.8} />
-              Skip receipts this month
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* stats bar */}
-      {receipts.length > 0 && (
-        <div className={styles.queueProgress}>
-          <div className={styles.progress}>
-            <div className={styles.progressTrack}>
-              <div
-                className={`${styles.progressFill} ${
-                  progressPct === 100 ? "" : progressPct < 40 ? styles.amber : ""
-                }`}
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-            <span className={styles.progressLabel}>{progressPct}% read</span>
-          </div>
-          <div className={styles.queueStats}>
-            <span>
-              <strong>{counts.extracted}</strong> read
-            </span>
-            <span className={styles.sep}>·</span>
-            <span>
-              <strong>{counts.review}</strong> review
-            </span>
-            <span className={styles.sep}>·</span>
-            <span>
-              <strong>{counts.failed}</strong> failed
-            </span>
-            {counts.dupes > 0 && (
-              <>
-                <span className={styles.sep}>·</span>
-                <span>
-                  <strong>{counts.dupes}</strong> dupes skipped
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* file list */}
-      {receipts.length > 0 && (
-        <div className={styles.section}>
-          <div className={styles.sectionHead}>
-            <div className={styles.sectionTitle}>
-              <span className={styles.sectionEyebrow}>Queue</span>
-              <h2 className={styles.sectionH2}>
-                {receipts.length} file{receipts.length !== 1 ? "s" : ""}
-              </h2>
-            </div>
-            <div className={styles.sectionActions}>
-              <button
-                type="button"
-                className={`${styles.btnGhostSmall} ${styles.sm}`}
-                onClick={() => onUpload?.([])}
-              >
-                Clear queue
-              </button>
-              <button
-                type="button"
-                className={`${styles.btnPrimary} ${styles.sm}`}
-              >
-                <IconPlus size={14} stroke={1.8} />
-                Add more
-              </button>
-            </div>
-          </div>
 
           <div className={styles.fileList}>
             {receipts.map((r) => (
               <ReceiptRow key={r.id} receipt={r} />
             ))}
           </div>
-        </div>
-      )}
 
-      {/* processing skeleton */}
-      {receipts.some((r) => r.status === "processing") && (
-        <div
-          className={`${styles.skeleton} ${styles.skeletonCard}`}
-          style={{ margin: "16px -20px" }}
-          aria-hidden="true"
-        >
-          <div
-            className={`${styles.skeleton} ${styles.skeletonLine}`}
-            style={{ width: "35%", height: 11, marginBottom: 12 }}
-          />
-          <div
-            className={`${styles.skeleton} ${styles.skeletonLine}`}
-            style={{ width: "60%", height: 12 }}
-          />
-        </div>
+          <p className={styles.sumNote}>
+            Read receipts are matched to your bank transactions automatically —
+            unmatched ones surface in Review.
+          </p>
+        </section>
       )}
     </div>
   );
@@ -362,17 +422,19 @@ export function ReceiptImportScreen({
 
 function ReceiptRow({ receipt }: { receipt: ReceiptFile }) {
   const m = STATUS_META[receipt.status];
-  const [editing, setEditing] = useState(false);
+  const iconCls = receipt.type === "pdf" ? styles.pdf : styles.image;
 
   return (
     <div
       className={`${styles.fileItem} ${receipt.status === "failed" ? styles.failed : ""}`}
-    >          <div className={receipt.type === "pdf" ? styles.pdf : styles.image}>
+    >
+      <div className={iconCls}>
         {receipt.type === "pdf" ? (
           <IconFileTypePdf size={17} stroke={1.8} />
         ) : (
           <IconPhoto size={17} stroke={1.8} />
-        )}</div>
+        )}
+      </div>
 
       <div className={styles.fileInfo}>
         <div className={styles.fileName}>{receipt.name}</div>
@@ -381,7 +443,9 @@ function ReceiptRow({ receipt }: { receipt: ReceiptFile }) {
           {receipt.pages && (
             <>
               <span className={styles.sep}>·</span>
-              <span>{receipt.pages} page{receipt.pages !== 1 ? "s" : ""}</span>
+              <span>
+                {receipt.pages} page{receipt.pages !== 1 ? "s" : ""}
+              </span>
             </>
           )}
           {receipt.duplicate && (
@@ -391,64 +455,55 @@ function ReceiptRow({ receipt }: { receipt: ReceiptFile }) {
             </>
           )}
         </div>
+        {receipt.status === "failed" && receipt.error && (
+          <div className={styles.rxError}>{receipt.error}</div>
+        )}
       </div>
 
       {receipt.status === "processing" && receipt.progress !== undefined && (
-        <div style={{ flex: 0, width: 80 }}>
-          <div
-            className={styles.progress}
-            style={{ gap: 6 }}
-          >
-            <div className={styles.progressTrack} style={{ height: 4 }}>
-              <div
-                className={styles.progressFill}
-                style={{
-                  width: `${receipt.progress}%`,
-                }}
-              />
-            </div>
-            <span className={styles.progressLabel} style={{ fontSize: 10 }}>
-              {Math.round(receipt.progress)}%
-            </span>
+        <div className={styles.rxProgress}>
+          <div className={styles.progressTrack}>
+            <div
+              className={styles.progressFill}
+              style={{ width: `${receipt.progress}%` }}
+            />
           </div>
+          <span className={styles.progressLabel}>
+            {Math.round(receipt.progress)}%
+          </span>
         </div>
       )}
 
       <div className={styles.fileStatus}>
         <span
-          className={`${styles.statusPill} ${m.cls}`}
+          className={`${styles.statusPill} ${m.cls} ${m.busy ? styles.rxBusy : ""}`}
           title={m.desc}
         >
+          {m.busy && (
+            <svg
+              className={styles.spin}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.4}
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M21 12a9 9 0 1 1-6.2-8.5" />
+            </svg>
+          )}
           {m.label}
         </span>
       </div>
 
       <div className={styles.fileActions}>
-        {receipt.status === "needs_review" && (
+        {(receipt.status === "needs_review" || receipt.status === "failed") && (
           <button
             type="button"
-            className={`${styles.fileActionBtn} ${styles.sm}`}
-            title="Review fields"
+            className={styles.fileActionBtn}
+            title={receipt.status === "failed" ? "Retry" : "Review fields"}
           >
             <IconRefresh size={13} stroke={1.8} />
-          </button>
-        )}
-        {receipt.status === "failed" && (
-          <button
-            type="button"
-            className={`${styles.fileActionBtn} ${styles.sm}`}
-            title="Retry"
-          >
-            <IconRefresh size={13} stroke={1.8} />
-          </button>
-        )}
-        {receipt.status === "extracted" && (
-          <button
-            type="button"
-            className={`${styles.fileActionBtn} ${styles.sm}`}
-            title="Review fields"
-          >
-            <IconCheck size={13} stroke={1.8} />
           </button>
         )}
         <button

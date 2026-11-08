@@ -2949,6 +2949,54 @@
   color: #5c6459;
 }
 
+/* image receipts — same family as the export file-type chips */
+
+.image {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  flex: 0 0 auto;
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+
+/* receipt queue extras */
+
+.rxError {
+  margin-top: 2px;
+  color: var(--red-ink);
+  font-size: 10.5px;
+}
+
+.rxProgress {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  width: 88px;
+}
+
+.rxProgress .progressTrack {
+  flex: 1;
+  height: 4px;
+}
+
+.rxProgress .progressLabel {
+  font-size: 10px;
+}
+
+.statusPill svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* busy pill: spinner replaces the status dot */
+.statusPill.rxBusy::before {
+  display: none;
+}
+
 .fileList em {
   margin-left: auto;
   color: var(--muted);
