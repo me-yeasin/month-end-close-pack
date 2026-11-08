@@ -13,6 +13,7 @@ import { SettingsScreen } from "./settings-screen";
 import { OverviewScreen } from "./overview-screen";
 import { useAiStore, loadAiConfig } from "./ai-store";
 import { useImportStore } from "./import-store";
+import { buildSummary } from "./summary";
 import { useUiStore } from "./ui-store";
 import { MonthPicker } from "./month-picker";
 import { AddFilesModal } from "./add-files-modal";
@@ -83,6 +84,8 @@ export default function Home() {
   const importJob = useImportStore((state) => state.job);
   const hydrateImport = useImportStore((state) => state.hydrate);
   const startImport = useImportStore((state) => state.startImport);
+  const resolveTransactions = useImportStore((state) => state.resolveTransactions);
+  const setCategory = useImportStore((state) => state.setCategory);
   const activeAiProvider =
     aiProviders.find((p) => p.id === aiActiveProviderId) ?? null;
 
@@ -178,11 +181,11 @@ export default function Home() {
     account: t.account || undefined,
     amount: t.amount,
     direction: t.direction,
-    category: undefined,
-    categoryId: undefined,
-    vat: undefined,
+    category: t.category,
+    categoryId: t.categoryId,
+    vat: t.vatTreatment,
     note: undefined,
-    personal: false,
+    personal: t.reviewState === "personal",
     matchStatus: (t.flag ? "partial" : "matched") as
       | "matched"
       | "partial"
@@ -197,6 +200,8 @@ export default function Home() {
     flagged: Boolean(t.flag),
   }));
 
+  // Unresolved flags only — resolving an item clears its flag in the store,
+  // so the review list and all counts stay consistent automatically.
   const reviewExceptions = importTransactions
     .filter((t) => t.flag)
     .map((t) => ({
@@ -210,12 +215,20 @@ export default function Home() {
       message: t.description,
       sub: t.flag!.reason,
       date: formatTxDate(t.date),
-      category: undefined,
+      category: t.category,
       value: t.amount,
-      checked: false,
     }));
 
+  const resolvedCount = importTransactions.filter(
+    (t) => !t.flag && t.reviewState !== undefined,
+  ).length;
   const flaggedCount = reviewExceptions.length;
+
+  const monthSummary = buildSummary(
+    importTransactions,
+    formatPeriodLong({ month: workspace.month, year: workspace.year }),
+    workspace.currency,
+  );
 
   return (
     <div className={styles.shell}>
@@ -403,37 +416,20 @@ export default function Home() {
           {view === "review" && (
             <ExceptionsScreen
               exceptions={reviewExceptions}
-              onAcceptSuggested={() => {}}
-              onSetCategory={() => {}}
-              onMarkPersonal={() => {}}
-              onMarkReviewed={() => {}}
+              resolvedCount={resolvedCount}
+              onAcceptSuggested={(ids) => void resolveTransactions(ids, "accepted")}
+              onSetCategory={(ids, categoryId) => void setCategory(ids, categoryId)}
+              onMarkPersonal={(ids) => void resolveTransactions(ids, "personal")}
+              onMarkReviewed={(ids) => void resolveTransactions(ids, "reviewed")}
               currency={workspace.currency}
             />
           )}
 
           {view === "summary" && (
             <MonthSummaryScreen
-              summary={{
-                monthLabel: formatPeriodLong({
-                  month: workspace.month,
-                  year: workspace.year,
-                }),
-                currency: workspace.currency,
-                totalIn: 0,
-                totalOut: 0,
-                net: 0,
-                categories: [],
-                vat: { included: 0, excluded: 0, rate: 0, net: 0 },
-                counts: {
-                  missingReceipts: 0,
-                  unmatchedReceipts: 0,
-                  duplicates: 0,
-                  uncategorised: 0,
-                  lowConfidence: 0,
-                },
-                readiness: 0,
-                blockers: [],
-              }}
+              onReview={() => setView("review")}
+              onExport={() => setView("export")}
+              summary={monthSummary}
             />
           )}
 

@@ -1,15 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
 import {
-  IconTrendingUp,
-  IconTrendingDown,
+  IconReceipt,
   IconDuplicate,
   IconAlertTriangle,
   IconCheck,
   IconClipboard,
-  IconCurrency,
-  IconCash,
+  IconLinkOff,
+  IconArrowRight,
+  IconDownload,
 } from "@tabler/icons-react";
 import styles from "./home.module.css";
 
@@ -26,8 +25,6 @@ interface Summary {
   totalIn: number;
   totalOut: number;
   net: number;
-  inDelta?: number;
-  outDelta?: number;
   categories: CategoryRow[];
   vat: {
     included: number;
@@ -46,606 +43,458 @@ interface Summary {
   blockers: { label: string; count: number; value?: number }[];
 }
 
-export function MonthSummaryScreen({ summary }: { summary: Summary }) {
-  const currencySymbol = summary.currency === "GBP" ? "£" : "€";
+export function MonthSummaryScreen({
+  summary,
+  onReview,
+  onExport,
+}: {
+  summary: Summary;
+  /** Open the review screen from the blockers card / hero. */
+  onReview?: () => void;
+  /** Open the export screen from the pack card / hero. */
+  onExport?: () => void;
+}) {
+  const symbol = summary.currency === "GBP" ? "£" : "€";
 
-  const largest = useMemo(
-    () => (summary.categories.length ? Math.max(...summary.categories.map((c) => c.amount)) : 1),
-    [summary.categories],
-  );
+  const money = (v: number) =>
+    v.toLocaleString("en-GB", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const counts = summary.counts;
+  const attentionTotal =
+    counts.missingReceipts +
+    counts.unmatchedReceipts +
+    counts.duplicates +
+    counts.uncategorised +
+    counts.lowConfidence;
+
+  const isEmpty =
+    summary.totalIn === 0 && summary.totalOut === 0 && summary.categories.length === 0;
+  const blocked = summary.blockers.length > 0;
+  const hasVatData = summary.vat.included !== 0 || summary.vat.excluded !== 0;
+
+  const largest = summary.categories.length
+    ? Math.max(...summary.categories.map((c) => c.amount))
+    : 1;
+
+  // hero copy — mirrors the overview tone
+  let heroTitle: React.ReactNode;
+  let heroText: string;
+  if (isEmpty) {
+    heroTitle = (
+      <>
+        Nothing to <em>summarize yet.</em>
+      </>
+    );
+    heroText =
+      "Import a bank statement and this summary builds itself — totals, categories, VAT and pack readiness.";
+  } else if (blocked) {
+    heroTitle = (
+      <>
+        Almost <em>accountant-ready.</em>
+      </>
+    );
+    heroText = `${symbol}${money(summary.totalIn)} in, ${symbol}${money(
+      summary.totalOut,
+    )} out. ${summary.blockers.length} blocker${
+      summary.blockers.length === 1 ? "" : "s"
+    } stand between you and the export.`;
+  } else {
+    heroTitle = (
+      <>
+        Ready for <em>your accountant.</em>
+      </>
+    );
+    heroText = `${symbol}${money(summary.totalIn)} in, ${symbol}${money(
+      summary.totalOut,
+    )} out, net ${symbol}${money(Math.abs(summary.net))}. No blockers — export whenever you like.`;
+  }
+
+  const COUNT_CARDS = [
+    { key: "missingReceipts", label: "Missing receipts", icon: <IconReceipt size={15} stroke={1.8} />, tint: styles.sumIconRed },
+    { key: "unmatchedReceipts", label: "Unmatched receipts", icon: <IconLinkOff size={15} stroke={1.8} />, tint: styles.sumIconAmber },
+    { key: "duplicates", label: "Duplicates", icon: <IconDuplicate size={15} stroke={1.8} />, tint: styles.sumIconMuted },
+    { key: "uncategorised", label: "Uncategorised", icon: <IconClipboard size={15} stroke={1.8} />, tint: styles.sumIconAmber },
+    { key: "lowConfidence", label: "Low confidence", icon: <IconAlertTriangle size={15} stroke={1.8} />, tint: styles.sumIconBlue },
+  ] as const;
 
   return (
     <div className={styles.screen}>
-      {/* header */}
+      {/* ------------------------------ header ------------------------------ */}
       <div className={styles.sectionHead}>
         <div className={styles.sectionTitle}>
-          <span className={styles.sectionEyebrow}>This month</span>
+          <span className={styles.sectionEyebrow}>Summary</span>
           <h2 className={styles.sectionH2}>{summary.monthLabel}</h2>
         </div>
         <div className={styles.sectionActions}>
           <span className={styles.tag}>{summary.currency}</span>
-          <span className={styles.tag}>
-            {summary.counts.missingReceipts + summary.counts.uncategorised} to resolve
-          </span>
+          {attentionTotal > 0 && (
+            <span className={styles.tag}>
+              {attentionTotal} to resolve
+            </span>
+          )}
         </div>
       </div>
 
-      {/* totals */}
-      <div
-        className={`${styles.section} ${styles.money}`}
-        style={{ borderColor: "var(--line)", background: "var(--surface)" }}
-      >
-        <div className={styles.moneyRow}>
-          <span className={styles.label}>Money in</span>
-          <span className={styles.value}>
-            <strong>
-              {currencySymbol}
-              {summary.totalIn.toFixed(2)}
-            </strong>
-            {summary.inDelta !== undefined && (
-              <small
-                className={summary.inDelta >= 0 ? styles.up : "color: var(--red-ink)"}
-              >
-                {summary.inDelta >= 0 ? "+" : ""}
-                {summary.inDelta.toFixed(1)}% vs last month
-              </small>
-            )}
-          </span>
-        </div>
-        <div className={styles.moneyRow}>
-          <span className={styles.label}>Money out</span>
-          <span className={styles.value}>
-            <strong>
-              {currencySymbol}
-              {summary.totalOut.toFixed(2)}
-            </strong>
-            {summary.outDelta !== undefined && (
-              <small
-                className={summary.outDelta >= 0 ? styles.up : "color: var(--red-ink)"}
-              >
-                {summary.outDelta >= 0 ? "+" : ""}
-                {summary.outDelta.toFixed(1)}% vs last month
-              </small>
-            )}
-          </span>
-        </div>
-        <div className={`${styles.moneyRow} ${styles.net}`}>
-          <span className={styles.label}>Net</span>
-          <span className={styles.value}>
-            <strong>
-              {currencySymbol}
-              {summary.net.toFixed(2)}
-            </strong>
-            <small>vs last month</small>
-          </span>
-        </div>
-      </div>
-
-      {/* category breakdown */}
-      <div className={styles.section}>
-        <div className={styles.sectionHead}>
-          <div className={styles.sectionTitle}>
-            <span className={styles.sectionEyebrow}>Where it went</span>
-            <h2 className={styles.sectionH2}>By category</h2>
+      {/* ------------------------------ hero ------------------------------ */}
+      <section className={styles.hero} aria-labelledby="summary-title">
+        <div className={styles.heroCopy}>
+          <div className={styles.heroEyebrow}>
+            <i aria-hidden="true" />
+            Month summary
           </div>
-          <button type="button" className={styles.cardLink}>
-            All categories
-          </button>
+          <h1 id="summary-title">{heroTitle}</h1>
+          <p>{heroText}</p>
+          <div className={styles.heroActions}>
+            {isEmpty ? null : blocked ? (
+              <>
+                <button
+                  type="button"
+                  className={`${styles.btnPrimary} ${styles.btnAmber}`}
+                  onClick={onReview}
+                >
+                  Review blockers
+                  <IconArrowRight size={15} stroke={2} />
+                </button>
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  onClick={onExport}
+                  disabled
+                  title="Resolve blockers to unlock the export"
+                >
+                  <IconDownload size={15} stroke={1.8} />
+                  Export locked
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className={`${styles.btnPrimary} ${styles.btnAmber}`}
+                onClick={onExport}
+              >
+                <IconDownload size={15} stroke={2} />
+                Export pack
+              </button>
+            )}
+          </div>
         </div>
 
-        {summary.categories.length === 0 ? (
-          <div className={styles.empty} style={{ padding: "24px 12px" }}>
-            <div className={styles.emptyTitle}>No categories yet</div>
-            <div className={styles.emptyDesc}>
-              Assign categories to transactions and they will appear here.
-            </div>
+        {isEmpty ? (
+          <div className={styles.heroEmpty} aria-hidden="true">
+            <span className={styles.heroEmptyRing}>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                <path d="M14 2v6h6" />
+                <path d="M12 18v-6" />
+                <path d="m9 15 3-3 3 3" />
+              </svg>
+            </span>
+            <span className={styles.heroEmptyLabel}>No data yet</span>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {summary.categories.map((c) => (
-              <div key={c.name} className={styles.catRow}>
-                <div className={styles.catTop}>
-                  <span>{c.name}</span>
-                  <strong>
-                    {currencySymbol}
-                    {c.amount.toLocaleString(undefined, {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    })}
-                  </strong>
-                </div>
-                <div className={styles.bar}>
-                  <span
-                    style={{
-                      width: `${Math.min(100, (c.amount / largest) * 100)}%`,
-                      background:
-                        c.color
-                          ? `linear-gradient(90deg, ${c.color}, ${c.color}dd)`
-                          : "linear-gradient(90deg, var(--forest-3), #4c8b6a)",
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* VAT summary */}
-      <div className={styles.section}>
-        <div className={styles.sectionHead}>
-          <div className={styles.sectionTitle}>
-            <span className={styles.sectionEyebrow}>VAT summary</span>
-            <h2 className={styles.sectionH2}>Simple view, not a return</h2>
-          </div>
-        </div>
-
-        <div
-          className={styles.tableWrap}
-          style={{ marginTop: 2, borderTop: "1px solid var(--line)" }}
-        >
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: 12,
-            }}
-          >
-            <tbody>
-              <tr>
-                <td
-                  style={{
-                    padding: "9px 0",
-                    color: "var(--muted)",
-                    fontSize: 11,
-                    width: "55%",
-                  }}
-                >
-                  VAT included in amounts
-                </td>
-                <td
-                  style={{
-                    textAlign: "right",
-                    fontVariantNumeric: "tabular-nums",
-                    fontWeight: 550,
-                  }}
-                >
-                  {currencySymbol}
-                  {summary.vat.included.toFixed(2)}
-                </td>
-              </tr>
-              <tr>
-                <td
-                  style={{
-                    padding: "9px 0",
-                    color: "var(--muted)",
-                    fontSize: 11,
-                    borderTop: "1px solid var(--line)",
-                  }}
-                >
-                  VAT excluded from amounts
-                </td>
-                <td
-                  style={{
-                    textAlign: "right",
-                    fontVariantNumeric: "tabular-nums",
-                    fontWeight: 550,
-                    borderTop: "1px solid var(--line)",
-                  }}
-                >
-                  {currencySymbol}
-                  {summary.vat.excluded.toFixed(2)}
-                </td>
-              </tr>
-              <tr>
-                <td
-                  style={{
-                    padding: "9px 0",
-                    color: "var(--muted)",
-                    fontSize: 11,
-                    borderTop: "1px solid var(--line)",
-                  }}
-                >
-                  Implied VAT rate
-                </td>
-                <td
-                  style={{
-                    textAlign: "right",
-                    fontVariantNumeric: "tabular-nums",
-                    fontWeight: 550,
-                    borderTop: "1px solid var(--line)",
-                  }}
-                >
-                  {summary.vat.rate.toFixed(1)}%
-                </td>
-              </tr>
-              <tr>
-                <td
-                  style={{
-                    padding: "9px 0",
-                    color: "var(--muted)",
-                    fontSize: 11,
-                    borderTop: "1px solid var(--line)",
-                  }}
-                >
-                  Total net (approx.)
-                </td>
-                <td
-                  style={{
-                    textAlign: "right",
-                    fontVariantNumeric: "tabular-nums",
-                    fontWeight: 600,
-                    color: "var(--forest-3)",
-                    borderTop: "1px solid var(--line)",
-                  }}
-                >
-                  {currencySymbol}
-                  {summary.vat.net.toFixed(2)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div
-          className={styles.callout}
-          style={{ margin: "12px -12px 0", background: "var(--blue-soft)", color: "var(--blue-ink)", borderColor: "#c3d6e0" }}
-        >
-          <span className={`${styles.calloutIcon} ${styles.exIcon} ${styles.blue}`}>
-            <IconCurrency size={15} stroke={1.8} />
-          </span>
-          <div>
-            <strong>Not a VAT return.</strong>
-            <p style={{ margin: "5px 0 0", color: "inherit" }}>
-              This is a simple summary to help you and your accountant. It does
-              not replace a formal VAT calculation.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* exceptions */}
-      <div className={styles.section}>
-        <div className={styles.sectionHead}>
-          <div className={styles.sectionTitle}>
-            <span className={styles.sectionEyebrow}>What is blocking the pack</span>
-            <h2 className={styles.sectionH2}>Exceptions</h2>
-          </div>
-          <button
-            type="button"
-            className={`${styles.btnSecondary} ${styles.sm}`}
-          >              <IconAlertTriangle size={13} stroke={1.8} />
-            Review
-          </button>
-        </div>
-
-        <div
-          className={styles.metaRow}
-          style={{ marginTop: 4 }}
-        >
-          <div className={styles.metaItem}>
-            <span
-              className={`${styles.statusPill} ${styles.danger}`}
-            >
-              <IconAlertTriangle size={11} stroke={2} />
-            </span>
-            <strong>{summary.counts.missingReceipts}</strong> missing receipt
-            {summary.counts.missingReceipts !== 1 ? "s" : ""}
-          </div>
-          <div className={styles.metaItem}>
-            <span
-              className={`${styles.statusPill} ${styles.warning}`}
-            >
-              <IconAlertTriangle size={11} stroke={2} />
-            </span>
-            <strong>{summary.counts.unmatchedReceipts}</strong> unmatched receipt
-            {summary.counts.unmatchedReceipts !== 1 ? "s" : ""}
-          </div>
-          <div className={styles.metaItem}>
-            <span
-              className={`${styles.statusPill} ${styles.muted}`}
-            >
-              <IconDuplicate size={11} stroke={2} />
-            </span>
-            <strong>{summary.counts.duplicates}</strong> duplicate
-            {summary.counts.duplicates !== 1 ? "s" : ""}
-          </div>
-          <div className={styles.metaItem}>
-            <span
-              className={`${styles.statusPill} ${styles.amber}`}
-            >
-              <IconClipboard size={11} stroke={2} />
-            </span>
-            <strong>{summary.counts.uncategorised}</strong> uncategorised
-          </div>
-          <div className={styles.metaItem}>
-            <span
-              className={`${styles.statusPill} ${styles.amber}`}
-            >
-              <IconAlertTriangle size={11} stroke={2} />
-            </span>
-            <strong>{summary.counts.lowConfidence}</strong> low confidence
-          </div>
-        </div>
-      </div>
-
-      {/* readiness */}
-      <div className={`${styles.section} ${styles.pack}`}>
-        <div className={styles.sectionHead}>
-          <div className={styles.sectionTitle}>
-            <span className={styles.sectionEyebrow}>Pack readiness</span>
-            <h2 className={styles.sectionH2}>Is this month ready for your accountant?</h2>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 22,
-            padding: "6px 0 4px",
-          }}
-        >
           <div
-            style={{
-              position: "relative",
-              width: 96,
-              height: 96,
-              flexShrink: 0,
-            }}
+            className={styles.heroRing}
+            role="img"
+            aria-label={`${summary.readiness}% pack readiness`}
           >
-            <svg
-              viewBox="0 0 120 120"
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", transform: "rotate(-90deg)" }}
-              aria-hidden="true"
-            >
-              <circle
-                cx="60"
-                cy="60"
-                r="50"
-                fill="none"
-                stroke="rgba(243, 237, 220, 0.14)"
-                strokeWidth="9"
-              />
-              <circle
-                cx="60"
-                cy="60"
-                r="50"
-                fill="none"
-                stroke="url(#rg)"
-                strokeWidth="9"
-                strokeLinecap="round"
-                strokeDasharray={`${(summary.readiness / 100) * 314.16} 314.16`}
-              />
+            <svg className={styles.ring} viewBox="0 0 140 140" aria-hidden="true">
               <defs>
-                <linearGradient id="rg" x1="0" y1="0" x2="1" y2="1">
+                <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
                   <stop offset="0" stopColor="#F5EFDD" />
                   <stop offset="0.55" stopColor="#F0C877" />
                   <stop offset="1" stopColor="#E7B24A" />
                 </linearGradient>
               </defs>
+              <circle className={styles.ringTrack} cx="70" cy="70" r="56" />
+              <circle
+                className={styles.ringValue}
+                cx="70"
+                cy="70"
+                r="56"
+                style={{
+                  strokeDasharray: `${(summary.readiness / 100) * 351.9} 351.9`,
+                }}
+              />
             </svg>
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 1,
-                color: "var(--ink)",
-              }}
-            >
-              <strong
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 30,
-                  fontWeight: 400,
-                  letterSpacing: "-0.02em",
-                  lineHeight: 1,
-                }}
-              >
+            <div className={styles.ringLabel}>
+              <strong>
                 {summary.readiness}
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: "var(--amber-ink)",
-                    marginLeft: 1,
-                  }}
-                >
-                  %
-                </span>
+                <span>%</span>
               </strong>
-              <span
-                style={{
-                  color: "var(--muted)",
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                }}
-              >
-                ready
-              </span>
+              <span>pack readiness</span>
             </div>
           </div>
+        )}
+      </section>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 10,
-              }}
-            >
-              <span
-                className={`${styles.statusPill} ${
-                  summary.readiness >= 90
-                    ? styles.success
-                    : summary.readiness >= 60
-                    ? styles.warning
-                    : styles.danger
-                }`}
-              >
-                {summary.readiness >= 90
-                  ? "Almost ready"
-                  : summary.readiness >= 60
-                  ? "In progress"
-                  : "Needs work"}
+      {/* ------------------------------ totals strip ------------------------------ */}
+      <section className={styles.sumTotals} aria-label="Month totals">
+        <div className={styles.sumTotal}>
+          <span className={styles.sumTotalLabel}>Money in</span>
+          <strong className={`${styles.sumTotalValue} ${styles.sumTotalIn}`}>
+            {symbol}
+            {money(summary.totalIn)}
+          </strong>
+        </div>
+        <div className={styles.sumTotal}>
+          <span className={styles.sumTotalLabel}>Money out</span>
+          <strong className={styles.sumTotalValue}>
+            {symbol}
+            {money(summary.totalOut)}
+          </strong>
+        </div>
+        <div className={styles.sumTotal}>
+          <span className={styles.sumTotalLabel}>Net</span>
+          <strong className={`${styles.sumTotalValue} ${styles.sumTotalNet}`}>
+            {summary.net < 0 ? "−" : ""}
+            {symbol}
+            {money(Math.abs(summary.net))}
+          </strong>
+        </div>
+      </section>
+
+      {/* ------------------------------ attention counts ------------------------------ */}
+      {!isEmpty && attentionTotal > 0 && (
+        <section className={styles.sumCounts} aria-label="Items needing attention">
+          {COUNT_CARDS.map((c) => (
+            <div key={c.key} className={styles.sumCount}>
+              <span className={`${styles.sumCountIcon} ${c.tint}`}>{c.icon}</span>
+              <span className={styles.sumCountText}>
+                <strong className={styles.sumCountNum}>{counts[c.key]}</strong>
+                <span className={styles.sumCountLabel}>{c.label}</span>
               </span>
-              {summary.blockers.length > 0 && (
-                <span className={styles.tag}>
-                  {summary.blockers.length} blocker{summary.blockers.length !== 1 ? "s" : ""}
-                </span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* ------------------------------ detail grid ------------------------------ */}
+      <div className={styles.contentGrid}>
+        {/* LEFT — categories + VAT */}
+        <div className={styles.stack}>
+          <section className={styles.card}>
+            <div className={styles.cardHead}>
+              <div>
+                <span className={styles.eyebrowSm}>Where it went</span>
+                <h2>By category</h2>
+              </div>
+            </div>
+
+            {summary.categories.length === 0 ? (
+              <div className={styles.empty} style={{ padding: "24px 12px" }}>
+                <div className={styles.emptyTitle}>No categories yet</div>
+                <div className={styles.emptyDesc}>
+                  Assign categories to transactions and they will appear here.
+                </div>
+              </div>
+            ) : (
+              summary.categories.map((c) => (
+                <div key={c.name} className={styles.catRow}>
+                  <div className={styles.catTop}>
+                    <span>{c.name}</span>
+                    <strong>
+                      {symbol}
+                      {c.amount.toLocaleString("en-GB", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })}
+                    </strong>
+                  </div>
+                  <div className={styles.bar}>
+                    <span
+                      style={{
+                        width: `${Math.min(100, (c.amount / largest) * 100)}%`,
+                        background: c.color
+                          ? `linear-gradient(90deg, ${c.color}, ${c.color}dd)`
+                          : "linear-gradient(90deg, var(--forest-3), #4c8b6a)",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </section>
+
+          <section className={styles.card}>
+            <div className={styles.cardHead}>
+              <div>
+                <span className={styles.eyebrowSm}>VAT summary</span>
+                <h2>Simple view, not a return</h2>
+              </div>
+            </div>
+
+            {hasVatData ? (
+              <>
+                <div className={styles.moneyRow}>
+                  <span className={styles.label}>VAT included in amounts</span>
+                  <span className={styles.value}>
+                    <strong>
+                      {symbol}
+                      {money(summary.vat.included)}
+                    </strong>
+                  </span>
+                </div>
+                <div className={styles.moneyRow}>
+                  <span className={styles.label}>VAT excluded from amounts</span>
+                  <span className={styles.value}>
+                    <strong>
+                      {symbol}
+                      {money(summary.vat.excluded)}
+                    </strong>
+                  </span>
+                </div>
+                <div className={styles.moneyRow}>
+                  <span className={styles.label}>Implied VAT rate</span>
+                  <span className={styles.value}>
+                    <strong>{summary.vat.rate.toFixed(1)}%</strong>
+                  </span>
+                </div>
+                <div className={`${styles.moneyRow} ${styles.net}`}>
+                  <span className={styles.label}>Total net (approx.)</span>
+                  <span className={styles.value}>
+                    <strong>
+                      {symbol}
+                      {money(summary.vat.net)}
+                    </strong>
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className={styles.empty} style={{ padding: "24px 12px" }}>
+                <div className={styles.emptyTitle}>No VAT data yet</div>
+                <div className={styles.emptyDesc}>
+                  Set a VAT treatment on your transactions and the summary
+                  will appear here.
+                </div>
+              </div>
+            )}
+
+            <p className={styles.sumNote}>
+              A simple summary to help you and your accountant — not a formal
+              VAT calculation.
+            </p>
+          </section>
+        </div>
+
+        {/* RIGHT — blockers + pack */}
+        <div className={styles.stack}>
+          <section className={styles.card} id="blockers">
+            <div className={styles.cardHead}>
+              <div>
+                <span className={styles.eyebrowSm}>Before you export</span>
+                <h2>Blockers</h2>
+              </div>
+              {!isEmpty && blocked && onReview && (
+                <button
+                  type="button"
+                  className={styles.cardLink}
+                  onClick={onReview}
+                >
+                  Review
+                  <IconArrowRight size={12} stroke={2} />
+                </button>
               )}
             </div>
 
-            {summary.blockers.length > 0 ? (
-              <ul
-                style={{
-                  listStyle: "none",
-                  margin: 0,
-                  padding: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
-                }}
-              >
-                {summary.blockers.map((b) => (
-                  <li
-                    key={b.label}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "7px 10px",
-                      border: "1px solid var(--line)",
-                      borderRadius: 9,
-                      background: "var(--surface-2)",
-                      fontSize: 11.5,
-                      color: "var(--ink-2)",
-                    }}
-                  >
-                    <span
-                      className={`${styles.statusPill} ${
-                        b.label.toLowerCase().includes("missing") ||
-                        b.label.toLowerCase().includes("receipt")
-                          ? styles.danger
-                          : b.label.toLowerCase().includes("categor")
-                          ? styles.amber
-                          : styles.muted
-                      }`}
-                    >
-                      {b.label.toLowerCase().includes("missing") ||
-                      b.label.toLowerCase().includes("receipt")
-                        ? <IconAlertTriangle size={10} stroke={2} />
-                        : b.label.toLowerCase().includes("categor")
-                        ? <IconAlertTriangle size={10} stroke={2} />
-                        : <IconDuplicate size={10} stroke={2} />}
-                    </span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      {b.label}
-                      {b.count !== undefined && (
-                        <>
-                          {" "}
-                          <span style={{ color: "var(--muted)" }}>
-                            ({b.count})
-                          </span>
-                        </>
-                      )}
-                      {b.value !== undefined && (
-                        <>
-                          {" "}
-                          <span style={{ color: "var(--muted)" }}>
-                            {currencySymbol}{b.value.toFixed(2)}
-                          </span>
-                        </>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : summary.totalIn === 0 && summary.totalOut === 0 ? (
-              <div
-                className={styles.callout}
-                style={{
-                  margin: -4,
-                  background: "var(--surface-2)",
-                  color: "var(--ink-2)",
-                  borderColor: "var(--line)",
-                }}
-              >
-                <span className={styles.calloutIcon}>
-                  <IconClipboard size={15} stroke={1.8} />
-                </span>
-                <p style={{ margin: 0, color: "inherit" }}>
-                  Import a bank statement to see your pack readiness.
-                </p>
+            {isEmpty ? (
+              <div className={styles.empty} style={{ padding: "24px 12px" }}>
+                <div className={styles.emptyTitle}>Nothing to check yet</div>
+                <div className={styles.emptyDesc}>
+                  Import a bank statement to see what blocks the pack.
+                </div>
               </div>
+            ) : blocked ? (
+              summary.blockers.map((b) => (
+                <div key={b.label} className={styles.exception}>
+                  <span
+                    className={`${styles.exIcon} ${
+                      b.label.toLowerCase().includes("receipt") ||
+                      b.label.toLowerCase().includes("missing")
+                        ? styles.sumIconRed
+                        : styles.sumIconAmber
+                    }`}
+                  >
+                    {b.label.toLowerCase().includes("categor") ? (
+                      <IconClipboard size={15} stroke={1.8} />
+                    ) : b.label.toLowerCase().includes("duplicate") ? (
+                      <IconDuplicate size={15} stroke={1.8} />
+                    ) : (
+                      <IconAlertTriangle size={15} stroke={1.8} />
+                    )}
+                  </span>
+                  <div className={styles.exBody}>
+                    <strong>{b.label}</strong>
+                    <span>
+                      {b.count} item{b.count !== 1 ? "s" : ""}
+                      {b.value !== undefined &&
+                        ` · ${symbol}${money(b.value)}`}
+                    </span>
+                  </div>
+                </div>
+              ))
             ) : (
-              <div
-                className={styles.callout}
-                style={{
-                  margin: -4,
-                  background: "var(--sage)",
-                  color: "var(--forest)",
-                  borderColor: "#c3d6c0",
-                }}
-              >
-                <span className={styles.calloutIcon}>
-                  <IconCheck size={15} stroke={2} />
-                </span>
-                <p style={{ margin: 0, color: "inherit" }}>
-                  No blockers. This pack is ready to export.
-                </p>
+              <div className={styles.empty} style={{ padding: "24px 12px" }}>
+                <div className={styles.emptyIcon}>
+                  <IconCheck size={22} stroke={1.8} />
+                </div>
+                <div className={styles.emptyTitle}>No blockers</div>
+                <div className={styles.emptyDesc}>
+                  Everything is reviewed. This month is ready to go.
+                </div>
               </div>
             )}
-          </div>
-        </div>
+          </section>
 
-        <div
-          className={styles.progress}
-          style={{ marginTop: 6 }}
-        >
-          <div className={styles.progressTrack}>
-            <div
-              className={`${styles.progressFill} ${
-                summary.readiness >= 90
-                  ? ""
-                  : summary.readiness >= 60
-                  ? styles.amber
-                  : styles.red
-              }`}
-              style={{ width: `${summary.readiness}%` }}
-            />
-          </div>
-          <span className={styles.progressLabel}>
-            {summary.readiness}% of the month reviewed
-          </span>
+          <section className={`${styles.card} ${styles.pack}`} id="pack">
+            <div className={styles.packHead}>
+              <span className={styles.packIcon}>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.7}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
+                  <path d="m4.5 7.5 7.5 4 7.5-4" />
+                  <path d="M12 12v9" />
+                </svg>
+              </span>
+              <div>
+                <strong>Accountant pack</strong>
+                <span>
+                  {isEmpty
+                    ? "Nothing to export yet"
+                    : blocked
+                      ? `${attentionTotal} to resolve`
+                      : "Ready to export"}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className={`${styles.btnPrimary} ${styles.full}`}
+              disabled={isEmpty || blocked}
+              onClick={onExport}
+            >
+              <IconDownload size={15} stroke={2} />
+              Export pack
+            </button>
+          </section>
         </div>
-      </div>
-
-      {/* footer note */}
-      <div
-        className={styles.callout}
-        style={{
-          margin: "-12px -12px 0",
-          background: "var(--surface-2)",
-          color: "var(--ink-2)",
-          borderColor: "var(--line)",
-        }}
-      >
-        <span className={styles.calloutIcon}>
-          <IconCash size={15} stroke={1.8} />
-        </span>
-        <p style={{ margin: 0, color: "inherit" }}>
-          Month-over-month figures compare against the previous exported month.
-        </p>
       </div>
     </div>
   );
 }
-
-

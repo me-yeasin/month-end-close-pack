@@ -15,6 +15,7 @@ import {
   type ImportJobRecord,
   type TransactionRecord,
 } from "./db";
+import { DEFAULT_CATEGORIES } from "../types";
 import {
   analyzeChunk,
   chunkTransactions,
@@ -24,6 +25,11 @@ import {
 } from "./bank-import";
 
 const CHUNK_SIZE = 30;
+
+/** How the user resolved a flagged transaction. */
+export type ReviewResolution = "accepted" | "personal" | "reviewed";
+
+const PERSONAL_CATEGORY = DEFAULT_CATEGORIES.find((c) => c.id === "personal");
 
 type ImportState = {
   transactions: TransactionRecord[];
@@ -35,6 +41,10 @@ type ImportState = {
     workspace: { id: string; month: number; year: number },
     ai: AiConfig,
   ) => Promise<void>;
+  /** Resolve flagged transactions: clears the flag and records the outcome. */
+  resolveTransactions: (ids: string[], resolution: ReviewResolution) => Promise<void>;
+  /** Assign a category and mark the transactions reviewed. */
+  setCategory: (ids: string[], categoryId: string) => Promise<void>;
   reset: () => void;
 };
 
@@ -222,4 +232,67 @@ export const useImportStore = create<ImportState>((set, get) => ({
   },
 
   reset: () => set({ transactions: [], job: null }),
+
+  resolveTransactions: async (ids, resolution) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+
+    const updates = get()
+      .transactions.filter((t) => idSet.has(t.id))
+      .map<TransactionRecord>((t) => ({
+        ...t,
+        flag: null,
+        reviewState: resolution,
+        // Personal expenses land in the dedicated "Personal or excluded" bucket
+        // so the uncategorised count in the summary stays honest.
+        ...(resolution === "personal" && PERSONAL_CATEGORY
+          ? { categoryId: PERSONAL_CATEGORY.id, category: PERSONAL_CATEGORY.name }
+          : {}),
+      }));
+
+    if (updates.length === 0) return;
+
+    // Optimistic: update memory first, persist after.
+    const updateMap = new Map(updates.map((t) => [t.id, t]));
+    set((state) => ({
+      transactions: state.transactions.map((t) => updateMap.get(t.id) ?? t),
+    }));
+
+    try {
+      await persistTransactions(updates);
+    } catch (err) {
+      console.error("Failed to persist review resolution", err);
+    }
+  },
+
+  setCategory: async (ids, categoryId) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    const name =
+      DEFAULT_CATEGORIES.find((c) => c.id === categoryId)?.name ?? categoryId;
+
+    const updates = get()
+      .transactions.filter((t) => idSet.has(t.id))
+      .map<TransactionRecord>((t) => ({
+        ...t,
+        categoryId,
+        category: name,
+        // A decided category also resolves the flag — the item has been handled.
+        flag: null,
+        reviewState: "reviewed",
+      }));
+
+    if (updates.length === 0) return;
+
+    const updateMap = new Map(updates.map((t) => [t.id, t]));
+    set((state) => ({
+      transactions: state.transactions.map((t) => updateMap.get(t.id) ?? t),
+    }));
+
+    try {
+      await persistTransactions(updates);
+    } catch (err) {
+      console.error("Failed to persist category", err);
+    }
+  },
 }));

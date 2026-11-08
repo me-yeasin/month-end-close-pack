@@ -26,6 +26,11 @@ type ExType =
   | "uncategorised"
   | "low_confidence";
 
+/**
+ * One row in the review list. The parent only passes *unresolved* items —
+ * resolved ones have their flag cleared in the store and disappear from
+ * `exceptions` on the next render.
+ */
 interface Exception {
   id: string;
   type: ExType;
@@ -35,7 +40,6 @@ interface Exception {
   date?: string;
   category?: string;
   value?: number;
-  checked?: boolean;
 }
 
 const FILTER_TABS: { key: string; label: string }[] = [
@@ -66,6 +70,7 @@ const SEVERITY: Record<string, { label: string; pillCls: string; iconCls: string
 
 export function ExceptionsScreen({
   exceptions,
+  resolvedCount = 0,
   onAcceptSuggested,
   onSetCategory,
   onMarkPersonal,
@@ -73,8 +78,10 @@ export function ExceptionsScreen({
   currency = "GBP",
 }: {
   exceptions: Exception[];
+  /** Items already resolved in this month (for the progress bar). */
+  resolvedCount?: number;
   onAcceptSuggested?: (ids: string[]) => void;
-  onSetCategory?: (ids: string[], category: string) => void;
+  onSetCategory?: (ids: string[], categoryId: string) => void;
   onMarkPersonal?: (ids: string[]) => void;
   onMarkReviewed?: (ids: string[]) => void;
   currency?: "GBP" | "EUR";
@@ -83,20 +90,13 @@ export function ExceptionsScreen({
 
   const [filter, setFilter] = useState("all");
   const [bulk, setBulk] = useState<string[]>([]);
-  const [resolved, setResolved] = useState<Set<string>>(new Set());
-  const [categories, setCategories] = useState<Record<string, string>>({});
   const [focusIdxRaw, setFocusIdx] = useState(0);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const open = useMemo(
-    () => exceptions.filter((e) => !resolved.has(e.id)),
-    [exceptions, resolved],
+  const filtered = useMemo(
+    () => (filter === "all" ? exceptions : exceptions.filter((e) => e.type === filter)),
+    [exceptions, filter],
   );
-
-  const filtered = useMemo(() => {
-    const base = filter === "all" ? exceptions : exceptions.filter((e) => e.type === filter);
-    return base.filter((e) => !resolved.has(e.id));
-  }, [exceptions, filter, resolved]);
 
   // keep keyboard focus inside bounds when the list changes — derived, not stored
   const focusIdx = Math.min(focusIdxRaw, Math.max(0, filtered.length - 1));
@@ -115,41 +115,11 @@ export function ExceptionsScreen({
     setBulk(allSelected ? [] : filtered.map((e) => e.id));
   };
 
-  const resolve = (ids: string[]) => {
-    setResolved((prev) => {
-      const next = new Set(prev);
-      ids.forEach((id) => next.add(id));
-      return next;
-    });
-    setBulk((prev) => prev.filter((id) => !ids.includes(id)));
-  };
-
-  const accept = (ids: string[]) => {
-    onAcceptSuggested?.(ids);
-    resolve(ids);
-  };
-
-  const markPersonal = (ids: string[]) => {
-    onMarkPersonal?.(ids);
-    resolve(ids);
-  };
-
-  const markReviewed = (ids: string[]) => {
-    onMarkReviewed?.(ids);
-    resolve(ids);
-  };
-
-  const setCategory = (ids: string[], categoryId: string) => {
+  const accept = (ids: string[]) => onAcceptSuggested?.(ids);
+  const markPersonal = (ids: string[]) => onMarkPersonal?.(ids);
+  const markReviewed = (ids: string[]) => onMarkReviewed?.(ids);
+  const setCategory = (ids: string[], categoryId: string) =>
     onSetCategory?.(ids, categoryId);
-    const name =
-      DEFAULT_CATEGORIES.find((c) => c.id === categoryId)?.name ?? categoryId;
-    setCategories((prev) => {
-      const next = { ...prev };
-      ids.forEach((id) => (next[id] = name));
-      return next;
-    });
-    resolve(ids);
-  };
 
   const acceptSuggestions = () => {
     const ids = filtered.filter((e) => e.severity !== "high").map((e) => e.id);
@@ -182,16 +152,15 @@ export function ExceptionsScreen({
     return () => window.removeEventListener("keydown", onKey);
   }); // re-registered on every render — closures stay fresh
 
-  // select-all checkbox: reflect page scope, support indeterminate
+  // select-all checkbox: reflect view scope, support indeterminate
   const allSelected = filtered.length > 0 && filtered.every((e) => bulk.includes(e.id));
   const someSelected = filtered.some((e) => bulk.includes(e.id)) && !allSelected;
   useEffect(() => {
     if (selectAllRef.current) selectAllRef.current.indeterminate = someSelected;
   }, [someSelected]);
 
-  const remaining = open.length;
-  const total = exceptions.length;
-  const progress = total > 0 ? Math.round(((total - remaining) / total) * 100) : 0;
+  const total = exceptions.length + resolvedCount;
+  const progress = total > 0 ? Math.round((resolvedCount / total) * 100) : 0;
   const suggestionCount = filtered.filter((e) => e.severity !== "high").length;
 
   const formatAmount = (v: number) =>
@@ -208,7 +177,7 @@ export function ExceptionsScreen({
         <div className={styles.sectionActions}>
           {total > 0 && (
             <span className={styles.tag}>
-              {remaining} of {total} to review
+              {exceptions.length} of {total} to review
             </span>
           )}
         </div>
@@ -236,7 +205,7 @@ export function ExceptionsScreen({
                 </span>
                 <button
                   type="button"
-                  className={`${styles.btnGhostSmall} ${styles.sm}`}
+                  className={styles.btnGhostSmall}
                   onClick={() => setBulk([])}
                 >
                   Clear
@@ -268,7 +237,7 @@ export function ExceptionsScreen({
                 </div>
                 <button
                   type="button"
-                  className={`${styles.btnSecondary} ${styles.sm}`}
+                  className={styles.btnSecondary}
                   onClick={() => markReviewed(selected)}
                 >
                   <IconCheck size={13} stroke={1.8} />
@@ -276,7 +245,7 @@ export function ExceptionsScreen({
                 </button>
                 <button
                   type="button"
-                  className={`${styles.btnDanger} ${styles.sm}`}
+                  className={styles.btnDanger}
                   onClick={() => markPersonal(selected)}
                 >
                   <IconUserOff size={13} stroke={1.8} />
@@ -290,8 +259,8 @@ export function ExceptionsScreen({
                 {FILTER_TABS.map((t) => {
                   const count =
                     t.key === "all"
-                      ? total
-                      : exceptions.filter((e) => e.type === t.key && !resolved.has(e.id)).length;
+                      ? exceptions.length
+                      : exceptions.filter((e) => e.type === t.key).length;
                   return (
                     <button
                       key={t.key}
@@ -313,7 +282,7 @@ export function ExceptionsScreen({
                 {suggestionCount > 0 && (
                   <button
                     type="button"
-                    className={`${styles.btnGhostSmall} ${styles.sm}`}
+                    className={styles.btnGhostSmall}
                     onClick={acceptSuggestions}
                   >
                     <IconCheck size={13} stroke={1.8} />
@@ -332,10 +301,10 @@ export function ExceptionsScreen({
               <IconCheck size={22} stroke={1.8} />
             </div>
             <div className={styles.emptyTitle}>
-              {total > 0 && remaining === 0 ? "All reviewed" : "Nothing here"}
+              {total > 0 ? "All reviewed" : "Nothing here"}
             </div>
             <div className={styles.emptyDesc}>
-              {total > 0 && remaining === 0
+              {total > 0
                 ? "Every exception has been handled. Your month is looking clean."
                 : "No exceptions match this filter."}
             </div>
@@ -375,7 +344,6 @@ export function ExceptionsScreen({
             {filtered.map((ex, idx) => {
               const sev = SEVERITY[ex.severity] ?? SEVERITY.low;
               const isFocused = idx === focusIdx;
-              const category = categories[ex.id] ?? ex.category;
               return (
                 <div
                   key={ex.id}
@@ -404,7 +372,7 @@ export function ExceptionsScreen({
                       <span className={styles.rwIssueType}>{GROUP[ex.type] ?? ex.type}</span>
                       <span className={styles.rwIssueTitle}>{ex.message}</span>
                       {ex.sub && <span className={styles.rwIssueReason}>{ex.sub}</span>}
-                      {category && <span className={styles.chip}>{category}</span>}
+                      {ex.category && <span className={styles.chip}>{ex.category}</span>}
                     </span>
                   </div>
 

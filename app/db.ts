@@ -85,6 +85,13 @@ export interface TransactionRecord {
     severity: "high" | "medium" | "low";
     reason: string;
   } | null;
+  /** Review outcome, set once the user resolves the flag. */
+  reviewState?: "accepted" | "personal" | "reviewed";
+  /** Assigned category (id + display name), if any. */
+  categoryId?: string;
+  category?: string;
+  /** VAT treatment chosen by the user, if any. */
+  vatTreatment?: "included" | "excluded" | "not_applicable";
   createdAt: string;
 }
 

@@ -6030,6 +6030,167 @@
   }
 }
 
+/* --------------------------------------------------------------------- */
+/* Screen: Summary                                                       */
+/* --------------------------------------------------------------------- */
+
+/* amber primary button used on the dark hero (matches overview hero CTA) */
+
+.btnAmber {
+  background: var(--amber);
+  color: #3d2a06;
+  box-shadow: 0 14px 24px -16px rgba(231, 178, 74, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* totals strip — three aligned figures with hairline dividers */
+
+.sumTotals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 6px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.sumTotal {
+  min-width: 0;
+  padding: 16px 22px;
+}
+
+.sumTotal + .sumTotal {
+  border-left: 1px solid var(--line);
+}
+
+.sumTotalLabel {
+  display: block;
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sumTotalValue {
+  display: block;
+  margin-top: 7px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sumTotalIn {
+  color: #2c7251;
+}
+
+.sumTotalNet {
+  color: var(--forest-3);
+}
+
+/* attention counts — auto-fit cards, no fixed widths */
+
+.sumCounts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.sumCount {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.sumCountIcon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+}
+
+.sumIconRed {
+  background: var(--red-soft);
+  color: var(--red-ink);
+}
+
+.sumIconAmber {
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+
+.sumIconBlue {
+  background: var(--blue-soft);
+  color: var(--blue-ink);
+}
+
+.sumIconMuted {
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+
+.sumCountText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sumCountNum {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.sumCountLabel {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* muted footnote inside a card */
+
+.sumNote {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .sumTotals {
+    grid-template-columns: 1fr;
+  }
+
+  .sumTotal + .sumTotal {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shell *,
   .shell *::before,
