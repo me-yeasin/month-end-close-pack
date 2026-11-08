@@ -1161,6 +1161,141 @@
   }
 }
 
+/* --------------------------------------------------------------------- */
+/* AI configuration warning banner + disabled-action tooltip             */
+/* --------------------------------------------------------------------- */
+
+.aiWarn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  border: 1px solid #ecd9b0;
+  border-radius: 14px;
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+
+.aiWarnIcon {
+  flex: 0 0 auto;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(231, 178, 74, 0.22);
+  color: var(--amber-ink);
+}
+
+.aiWarnIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.aiWarnText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.aiWarnText strong {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.aiWarnText span {
+  opacity: 0.85;
+  font-size: 11.5px;
+}
+
+.aiWarnBtn {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--amber-ink);
+  border-radius: 9px;
+  background: var(--amber-ink);
+  color: #fbf3df;
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.aiWarnBtn:hover {
+  background: #5f4110;
+  border-color: #5f4110;
+}
+
+.addFilesWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 0;
+  z-index: 20;
+  padding: 6px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 550;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(2px);
+  transition: opacity 0.12s, transform 0.12s, visibility 0.12s;
+  pointer-events: none;
+  box-shadow: 0 12px 26px -14px rgba(24, 36, 30, 0.55);
+}
+
+.tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 16px;
+  width: 8px;
+  height: 8px;
+  background: var(--surface);
+  border-right: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+  transform: translateY(-4px) rotate(45deg);
+}
+
+.addFilesWrap:hover .tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.btnSecondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btnSecondary:disabled:hover {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+@media (max-width: 560px) {
+  .aiWarn {
+    flex-wrap: wrap;
+  }
+
+  .aiWarnBtn {
+    width: 100%;
+  }
+}
+
 .afSection {
   display: flex;
   flex-direction: column;

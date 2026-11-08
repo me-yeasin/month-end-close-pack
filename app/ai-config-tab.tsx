@@ -121,13 +121,26 @@ export function AiConfigTab() {
     setFetching(true);
     setFetchError(null);
     try {
-      const res = await fetch(`${url}/models`, {
-        headers: apiKey.trim()
-          ? { Authorization: `Bearer ${apiKey.trim()}` }
-          : undefined,
+      // Go through our same-origin proxy to avoid browser CORS restrictions.
+      const res = await fetch("/api/ai/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseUrl: url, apiKey: apiKey.trim() }),
       });
-      if (!res.ok) throw new Error(String(res.status));
-      const json: unknown = await res.json();
+
+      const json: unknown = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const message =
+          json &&
+          typeof json === "object" &&
+          typeof (json as { error?: unknown }).error === "string"
+            ? (json as { error: string }).error
+            : `Request failed (${res.status}).`;
+        setFetchError(message);
+        return;
+      }
+
       let raw: unknown[] = [];
       if (Array.isArray(json)) raw = json;
       else if (json && typeof json === "object") {
@@ -153,9 +166,7 @@ export function AiConfigTab() {
       setSelected(new Set());
       if (ids.length === 0) setFetchError("No models were returned by the provider.");
     } catch {
-      setFetchError(
-        "Could not fetch models. Check the base URL, API key, and that the provider allows browser requests (CORS).",
-      );
+      setFetchError("Could not reach the server. Please try again.");
     } finally {
       setFetching(false);
     }

@@ -11,6 +11,7 @@ import { ExceptionsScreen } from "./exceptions-screen";
 import { MonthSummaryScreen } from "./summary-screen";
 import { ExportPackScreen } from "./export-screen";
 import { SettingsScreen } from "./settings-screen";
+import { useAiStore, loadAiConfig } from "./ai-store";
 import { useUiStore } from "./ui-store";
 import { MonthPicker } from "./month-picker";
 import { AddFilesModal } from "./add-files-modal";
@@ -48,6 +49,17 @@ export default function Home() {
   // add-files modal state
   const [addFilesOpen, setAddFilesOpen] = useState(false);
 
+  // AI provider configuration — gates the Add files action.
+  const aiProviders = useAiStore((state) => state.providers);
+  const aiActiveProviderId = useAiStore((state) => state.activeProviderId);
+  const aiActiveModelId = useAiStore((state) => state.activeModelId);
+  const hydrateAi = useAiStore((state) => state.hydrate);
+  const aiConfigured = aiProviders.some(
+    (p) =>
+      p.id === aiActiveProviderId &&
+      p.models.some((m) => m.id === aiActiveModelId),
+  );
+
   // Close the month picker when clicking outside the trigger + popover
   useEffect(() => {
     if (!monthPickerOpen) return;
@@ -75,8 +87,19 @@ export default function Home() {
   // On mount: read IndexedDB and hydrate the Zustand store.
   // useEffect never runs on the server — IndexedDB is browser-only.
   useEffect(() => {
-    Promise.all([loadAllWorkspaces(), loadActiveWorkspaceId()])
-      .then(([workspaces, activeId]) => hydrateWorkspaces(workspaces, activeId))
+    Promise.all([loadAllWorkspaces(), loadActiveWorkspaceId(), loadAiConfig()])
+      .then(([workspaces, activeId, aiConfig]) => {
+        hydrateWorkspaces(workspaces, activeId);
+        if (aiConfig) {
+          hydrateAi(
+            aiConfig.providers,
+            aiConfig.activeProviderId,
+            aiConfig.activeModelId,
+          );
+        } else {
+          hydrateAi([], null, null);
+        }
+      })
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -256,6 +279,38 @@ export default function Home() {
           {/* ================= VIEW CONTENT ================= */}
           {view === "overview" && (
             <>
+              {!aiConfigured && (
+                <div className={styles.aiWarn} role="alert">
+                  <span className={styles.aiWarnIcon} aria-hidden="true">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                      <path d="M12 9v4" />
+                      <path d="M12 17h.01" />
+                    </svg>
+                  </span>
+                  <div className={styles.aiWarnText}>
+                    <strong>AI model not configured</strong>
+                    <span>
+                      Configure an AI model to analyze your bank statements.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.aiWarnBtn}
+                    onClick={() => setView("settings")}
+                  >
+                    Configure
+                  </button>
+                </div>
+              )}
+
               {/* HERO */}
               <section className={styles.hero} aria-labelledby="hero-title">
                 <div className={styles.heroCopy}>
@@ -294,25 +349,40 @@ export default function Home() {
                         <path d="m13 6 6 6-6 6" />
                       </svg>
                     </button>
-                    <button
-                      type="button"
-                      className={`${styles.btnSecondary}`}
-                      onClick={() => setAddFilesOpen(true)}
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={1.8}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
+                    <span className={styles.addFilesWrap}>
+                      <button
+                        type="button"
+                        className={`${styles.btnSecondary}`}
+                        onClick={() => setAddFilesOpen(true)}
+                        disabled={!aiConfigured}
+                        aria-describedby={
+                          !aiConfigured ? "add-files-tooltip" : undefined
+                        }
                       >
-                        <path d="M12 5v14" />
-                        <path d="M5 12h14" />
-                      </svg>
-                      Add files
-                    </button>
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 5v14" />
+                          <path d="M5 12h14" />
+                        </svg>
+                        Add files
+                      </button>
+                      {!aiConfigured && (
+                        <span
+                          className={styles.tooltip}
+                          id="add-files-tooltip"
+                          role="tooltip"
+                        >
+                          Configure the AI model first
+                        </span>
+                      )}
+                    </span>
                   </div>
                   <div className={styles.heroMeta}>
                     <span>
