@@ -12,6 +12,7 @@ import { MonthSummaryScreen } from "./summary-screen";
 import { ExportPackScreen } from "./export-screen";
 import { useUiStore } from "./ui-store";
 import { MonthPicker } from "./month-picker";
+import { AddFilesModal } from "./add-files-modal";
 import { formatPeriodLong, formatPeriodShort, currentPeriod } from "./period";
 import { OnboardingScreen } from "./onboarding";
 import {
@@ -41,6 +42,9 @@ export default function Home() {
   // month picker popover state
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const monthRef = useRef<HTMLDivElement>(null);
+
+  // add-files modal state
+  const [addFilesOpen, setAddFilesOpen] = useState(false);
 
   // Close the month picker when clicking outside the trigger + popover
   useEffect(() => {
@@ -291,6 +295,7 @@ export default function Home() {
                     <button
                       type="button"
                       className={`${styles.btnSecondary}`}
+                      onClick={() => setAddFilesOpen(true)}
                     >
                       <svg
                         viewBox="0 0 24 24"
@@ -1148,6 +1153,8 @@ export default function Home() {
           )}
         </div>
       </main>
+
+      <AddFilesModal open={addFilesOpen} onClose={() => setAddFilesOpen(false)} />
     </div>
   );
 }
