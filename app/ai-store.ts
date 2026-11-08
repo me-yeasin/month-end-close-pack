@@ -4,6 +4,11 @@
  * Providers, their models, and the active selection are persisted to the
  * `aiConfig` IndexedDB store so the configuration survives reloads.
  *
+ * This configuration is GLOBAL: it lives in a single "singleton" row and is
+ * shared by every workspace. It is intentionally not scoped to a workspace, so
+ * adding, switching, or removing workspaces never changes it, and any change
+ * here applies to all workspaces (existing and future) automatically.
+ *
  * API keys are stored locally on this device only. (Encryption at rest is a
  * follow-up; the app is local-first and never uploads the config anywhere.)
  */
@@ -52,6 +57,7 @@ type AiState = {
   ) => void;
   addProvider: (provider: AiProvider) => void;
   setActiveModel: (providerId: string, modelId: string) => void;
+  removeProvider: (providerId: string) => void;
 };
 
 function persistFrom(
@@ -92,6 +98,21 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   setActiveModel: (providerId, modelId) => {
     set({ activeProviderId: providerId, activeModelId: modelId });
+    persistFrom(get());
+  },
+
+  removeProvider: (providerId) => {
+    set((state) => {
+      const providers = state.providers.filter((p) => p.id !== providerId);
+      let { activeProviderId, activeModelId } = state;
+      // If the active provider was removed, fall back to the first remaining one.
+      if (activeProviderId === providerId) {
+        const next = providers[0] ?? null;
+        activeProviderId = next?.id ?? null;
+        activeModelId = next?.models[0]?.id ?? null;
+      }
+      return { providers, activeProviderId, activeModelId };
+    });
     persistFrom(get());
   },
 }));

@@ -9,6 +9,7 @@ import {
   IconCheck,
   IconSparkles,
   IconAlertTriangle,
+  IconTrash,
 } from "@tabler/icons-react";
 import styles from "./home.module.css";
 import {
@@ -18,6 +19,50 @@ import {
   type AiModel,
 } from "./ai-store";
 
+/** Fetch the provider's available model IDs through our same-origin proxy. */
+async function fetchModelIds(baseUrl: string, apiKey: string): Promise<string[]> {
+  const res = await fetch("/api/ai/models", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ baseUrl, apiKey }),
+  });
+
+  const json: unknown = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    const message =
+      json &&
+      typeof json === "object" &&
+      typeof (json as { error?: unknown }).error === "string"
+        ? (json as { error: string }).error
+        : `Request failed (${res.status}).`;
+    throw new Error(message);
+  }
+
+  let raw: unknown[] = [];
+  if (Array.isArray(json)) raw = json;
+  else if (json && typeof json === "object") {
+    const obj = json as Record<string, unknown>;
+    if (Array.isArray(obj.data)) raw = obj.data;
+    else if (Array.isArray(obj.models)) raw = obj.models;
+  }
+
+  return Array.from(
+    new Set(
+      raw
+        .map((m) => {
+          if (typeof m === "string") return m;
+          if (m && typeof m === "object") {
+            const id = (m as { id?: unknown }).id;
+            if (typeof id === "string") return id;
+          }
+          return null;
+        })
+        .filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
+  );
+}
+
 export function AiConfigTab() {
   const providers = useAiStore((s) => s.providers);
   const activeProviderId = useAiStore((s) => s.activeProviderId);
@@ -26,6 +71,10 @@ export function AiConfigTab() {
   const hydrate = useAiStore((s) => s.hydrate);
   const addProvider = useAiStore((s) => s.addProvider);
   const setActiveModel = useAiStore((s) => s.setActiveModel);
+  const removeProvider = useAiStore((s) => s.removeProvider);
+
+  // Which saved provider is pending removal confirmation.
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   // Provider form
   const [providerName, setProviderName] = useState("");
@@ -35,6 +84,10 @@ export function AiConfigTab() {
   const [manualId, setManualId] = useState("");
   const [manualName, setManualName] = useState("");
   const [submitted, setSubmitted] = useState(false);
+
+  // Manual model availability test — only two outcomes: valid or invalid.
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<"valid" | "invalid" | null>(null);
 
   // Fetch models
   const [fetching, setFetching] = useState(false);
@@ -73,6 +126,7 @@ export function AiConfigTab() {
     );
     setManualId("");
     setManualName("");
+    setTestResult(null);
   };
 
   const updateModel = (index: number, patch: Partial<AiModel>) =>
@@ -121,54 +175,30 @@ export function AiConfigTab() {
     setFetching(true);
     setFetchError(null);
     try {
-      // Go through our same-origin proxy to avoid browser CORS restrictions.
-      const res = await fetch("/api/ai/models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl: url, apiKey: apiKey.trim() }),
-      });
-
-      const json: unknown = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        const message =
-          json &&
-          typeof json === "object" &&
-          typeof (json as { error?: unknown }).error === "string"
-            ? (json as { error: string }).error
-            : `Request failed (${res.status}).`;
-        setFetchError(message);
-        return;
-      }
-
-      let raw: unknown[] = [];
-      if (Array.isArray(json)) raw = json;
-      else if (json && typeof json === "object") {
-        const obj = json as Record<string, unknown>;
-        if (Array.isArray(obj.data)) raw = obj.data;
-        else if (Array.isArray(obj.models)) raw = obj.models;
-      }
-      const ids = Array.from(
-        new Set(
-          raw
-            .map((m) => {
-              if (typeof m === "string") return m;
-              if (m && typeof m === "object") {
-                const id = (m as { id?: unknown }).id;
-                if (typeof id === "string") return id;
-              }
-              return null;
-            })
-            .filter((v): v is string => typeof v === "string" && v.length > 0),
-        ),
-      );
+      const ids = await fetchModelIds(url, apiKey.trim());
       setFetched(ids);
       setSelected(new Set());
       if (ids.length === 0) setFetchError("No models were returned by the provider.");
-    } catch {
-      setFetchError("Could not reach the server. Please try again.");
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : "Could not fetch models.");
     } finally {
       setFetching(false);
+    }
+  };
+
+  const testModel = async () => {
+    const id = manualId.trim();
+    const url = baseUrl.trim().replace(/\/+$/, "");
+    if (!id || !url) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const ids = await fetchModelIds(url, apiKey.trim());
+      setTestResult(ids.includes(id) ? "valid" : "invalid");
+    } catch {
+      setTestResult("invalid");
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -209,11 +239,14 @@ export function AiConfigTab() {
   return (
     <>
       <div className={styles.settingsHeader}>
-        <h1 className={styles.settingsTitle}>Configure AI model</h1>
+        <div className={styles.settingsTitleRow}>
+          <h1 className={styles.settingsTitle}>Configure AI model</h1>
+          <span className={styles.settingsGlobalPill}>All workspaces</span>
+        </div>
         <p className={styles.settingsSub}>
           Connect an OpenAI-compatible provider to analyze your bank statements.
           Your data is only sent to the provider you choose, and your key stays on
-          this device.
+          this device. This configuration is shared across all workspaces.
         </p>
       </div>
 
@@ -268,7 +301,10 @@ export function AiConfigTab() {
                 className={`${styles.fieldInput} ${urlInvalid ? styles.error : ""}`}
                 placeholder="https://api.openai.com/v1"
                 value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
+                onChange={(e) => {
+                  setBaseUrl(e.target.value);
+                  setTestResult(null);
+                }}
                 autoComplete="off"
                 spellCheck={false}
               />
@@ -288,7 +324,10 @@ export function AiConfigTab() {
               className={`${styles.fieldInput} ${keyInvalid ? styles.error : ""}`}
               placeholder="sk-…"
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              onChange={(e) => {
+                setApiKey(e.target.value);
+                setTestResult(null);
+              }}
               autoComplete="off"
             />
             {keyInvalid && <span className={styles.aiErrorText}>Required</span>}
@@ -302,12 +341,15 @@ export function AiConfigTab() {
           </div>
 
           {/* manual add */}
-          <div className={styles.aiModelRow}>
+          <div className={styles.aiModelAddRow}>
             <input
               className={styles.fieldInput}
               placeholder="Model ID (e.g. gpt-4o-mini)"
               value={manualId}
-              onChange={(e) => setManualId(e.target.value)}
+              onChange={(e) => {
+                setManualId(e.target.value);
+                setTestResult(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -329,6 +371,36 @@ export function AiConfigTab() {
               }}
               autoComplete="off"
             />
+            <div className={styles.aiTestGroup}>
+              <button
+                type="button"
+                className={styles.btnGhostSmall}
+                onClick={testModel}
+                disabled={testing || !manualId.trim() || !baseUrl.trim()}
+              >
+                {testing ? "Testing…" : "Test"}
+              </button>
+              {testResult === "valid" && (
+                <span
+                  className={styles.aiTestValid}
+                  role="img"
+                  aria-label="Valid"
+                  title="Model is available"
+                >
+                  <IconCheck size={13} stroke={3} />
+                </span>
+              )}
+              {testResult === "invalid" && (
+                <span
+                  className={styles.aiTestInvalid}
+                  role="img"
+                  aria-label="Invalid"
+                  title="Model is not available"
+                >
+                  <IconX size={13} stroke={3} />
+                </span>
+              )}
+            </div>
             <button
               type="button"
               className={`${styles.btnSecondary} ${styles.btnSm}`}
@@ -502,9 +574,52 @@ export function AiConfigTab() {
               {providers.map((p) => (
                 <div key={p.id} className={styles.aiProviderGroup}>
                   <div className={styles.aiProviderHead}>
-                    <span className={styles.aiProviderName}>{p.name}</span>
-                    <span className={styles.aiProviderUrl}>{p.baseUrl}</span>
+                    <span className={styles.aiProviderInfo}>
+                      <span className={styles.aiProviderName}>{p.name}</span>
+                      <span className={styles.aiProviderUrl}>{p.baseUrl}</span>
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.aiProviderRemove}
+                      onClick={() =>
+                        setConfirmRemoveId((cur) =>
+                          cur === p.id ? null : p.id,
+                        )
+                      }
+                      aria-label={`Remove provider ${p.name}`}
+                      title="Remove provider"
+                    >
+                      <IconTrash size={14} stroke={1.8} />
+                    </button>
                   </div>
+
+                  {confirmRemoveId === p.id && (
+                    <div className={styles.aiProviderConfirm}>
+                      <span>
+                        Remove “{p.name}” and its models?
+                      </span>
+                      <div className={styles.aiProviderConfirmActions}>
+                        <button
+                          type="button"
+                          className={styles.btnGhostSmall}
+                          onClick={() => setConfirmRemoveId(null)}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.aiConfirmDelete}
+                          onClick={() => {
+                            removeProvider(p.id);
+                            setConfirmRemoveId(null);
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className={styles.aiModelPicks}>
                     {p.models.map((m) => {
                       const active =
