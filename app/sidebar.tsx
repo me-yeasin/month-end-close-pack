@@ -362,26 +362,27 @@ export function Sidebar() {
                             </svg>
                           )}
                         </button>
-                        {/* delete button — hidden until row is hovered, disabled if only 1 workspace */}
-                        <button
-                          type="button"
-                          className={styles.wsDeleteBtn}
-                          disabled={workspaces.length <= 1}
-                          aria-label={`Delete workspace ${ws.name}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setConfirmDeleteId(ws.id);
-                          }}
-                          title={workspaces.length <= 1 ? "Cannot delete the only workspace" : `Delete "${ws.name}"`}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M3 6h18" />
-                            <path d="M8 6V4h8v2" />
-                            <path d="M19 6l-1 14H6L5 6" />
-                            <path d="M10 11v6" />
-                            <path d="M14 11v6" />
-                          </svg>
-                        </button>
+                        {/* delete button — only rendered when more than one workspace exists */}
+                        {workspaces.length > 1 && (
+                          <button
+                            type="button"
+                            className={styles.wsDeleteBtn}
+                            aria-label={`Delete workspace ${ws.name}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDeleteId(ws.id);
+                            }}
+                            title={`Delete "${ws.name}"`}
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M3 6h18" />
+                              <path d="M8 6V4h8v2" />
+                              <path d="M19 6l-1 14H6L5 6" />
+                              <path d="M10 11v6" />
+                              <path d="M14 11v6" />
+                            </svg>
+                          </button>
+                        )}
                       </>
                     )}
                   </div>

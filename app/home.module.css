@@ -305,14 +305,6 @@
   height: 13px;
 }
 
-/* disabled state — last workspace, cannot delete */
-
-.wsDeleteBtn:disabled {
-  opacity: 0 !important;
-  pointer-events: none !important;
-  cursor: default;
-}
-
 /* inline confirmation inside the popover */
 
 .wsConfirmRow {
