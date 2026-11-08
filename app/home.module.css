@@ -832,6 +832,159 @@
   margin-left: 1px;
 }
 
+/* month picker popover (anchored under the month button) */
+
+.monthWrap {
+  position: relative;
+}
+
+.monthPopover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 200;
+  width: 250px;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow:
+    0 1px 0 rgba(24, 36, 30, 0.03),
+    0 16px 32px -20px rgba(24, 36, 30, 0.32),
+    0 4px 12px -6px rgba(24, 36, 30, 0.1);
+  animation: popoverIn 0.14s ease;
+}
+
+.monthPopHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
+.yearNav {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.yearNav:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.yearNav svg {
+  width: 15px;
+  height: 15px;
+}
+
+.yearLabel {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.monthCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.monthCell:hover {
+  background: var(--paper-2);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.monthCellSelected {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: #f3eddc;
+  font-weight: 650;
+}
+
+.monthTodayDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+.monthTodayDotOnSel {
+  background: var(--amber-soft);
+}
+
+.monthPopFoot {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.monthTodayBtn {
+  flex: 1;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.monthTodayBtn:hover {
+  border-color: var(--line-strong);
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.monthDoneBtn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--forest);
+  border-radius: 9px;
+  background: var(--forest);
+  color: #f3eddc;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.monthDoneBtn:hover {
+  background: var(--forest-2);
+  border-color: var(--forest-2);
+}
+
 .avatar {
   display: grid;
   width: 34px;

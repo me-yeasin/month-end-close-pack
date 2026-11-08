@@ -29,6 +29,9 @@ export interface WorkspaceRecord {
   name: string;
   currency: "GBP" | "EUR";
   vatStatus: "registered" | "unregistered";
+  /** Selected period — 0-11 (Jan-Dec) and the Gregorian year. */
+  month: number;
+  year: number;
   createdAt: string;   // ISO timestamp
 }
 

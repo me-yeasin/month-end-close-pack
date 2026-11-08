@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./home.module.css";
 import { MobileMenuButton } from "./mobile-menu-button";
 import { Sidebar } from "./sidebar";
@@ -11,11 +11,14 @@ import { ExceptionsScreen } from "./exceptions-screen";
 import { MonthSummaryScreen } from "./summary-screen";
 import { ExportPackScreen } from "./export-screen";
 import { useUiStore } from "./ui-store";
+import { MonthPicker } from "./month-picker";
+import { formatPeriodLong, formatPeriodShort, currentPeriod } from "./period";
 import { OnboardingScreen } from "./onboarding";
 import {
   loadAllWorkspaces,
   loadActiveWorkspaceId,
   createWorkspace as dbCreateWorkspace,
+  updateWorkspace as dbUpdateWorkspace,
 } from "./workspace-store";
 
 const VIEW_LABELS: Record<string, string> = {
@@ -33,6 +36,30 @@ export default function Home() {
   const workspace = useUiStore((state) => state.workspace);
   const hydrateWorkspaces = useUiStore((state) => state.hydrateWorkspaces);
   const addWorkspace = useUiStore((state) => state.addWorkspace);
+  const setPeriod = useUiStore((state) => state.setPeriod);
+
+  // month picker popover state
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const monthRef = useRef<HTMLDivElement>(null);
+
+  // Close the month picker when clicking outside the trigger + popover
+  useEffect(() => {
+    if (!monthPickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (monthRef.current && !monthRef.current.contains(e.target as Node)) {
+        setMonthPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [monthPickerOpen]);
+
+  // Commit a period: update in-memory state + persist per-workspace preference
+  const handleSelectPeriod = (month: number, year: number) => {
+    setPeriod(month, year);
+    if (workspace) dbUpdateWorkspace(workspace.id, { month, year });
+    setMonthPickerOpen(false);
+  };
 
   // true while we are reading IndexedDB on first mount
   const [loading, setLoading] = useState(true);
@@ -55,7 +82,12 @@ export default function Home() {
     return (
       <OnboardingScreen
         onComplete={async (setup) => {
-          const record = await dbCreateWorkspace(setup);
+          const now = currentPeriod();
+          const record = await dbCreateWorkspace({
+            ...setup,
+            month: now.month,
+            year: now.year,
+          });
           addWorkspace(record);
         }}
       />
@@ -72,7 +104,7 @@ export default function Home() {
           <header className={styles.topbar}>
             <div className={styles.crumbs}>
               <MobileMenuButton />
-              <span className={styles.crumbSection}>November 2026</span>
+              <span className={styles.crumbSection}>{formatPeriodLong({ month: workspace.month, year: workspace.year })}</span>
               {view !== "overview" && (
                 <>
                   <svg
@@ -114,35 +146,52 @@ export default function Home() {
                   <path d="m20 20-3.2-3.2" />
                 </svg>
               </button>
-              <button type="button" className={styles.monthBtn}>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.7}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+              <div className={styles.monthWrap} ref={monthRef}>
+                <button
+                  type="button"
+                  className={styles.monthBtn}
+                  onClick={() => setMonthPickerOpen((v) => !v)}
+                  aria-haspopup="dialog"
+                  aria-expanded={monthPickerOpen}
+                  aria-label={`Selected period ${formatPeriodLong({ month: workspace.month, year: workspace.year })}. Change month or year.`}
                 >
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <path d="M16 2v4" />
-                  <path d="M8 2v4" />
-                  <path d="M3 10h18" />
-                </svg>
-                Nov 2026
-                <svg
-                  className={styles.chev}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.7}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <path d="M16 2v4" />
+                    <path d="M8 2v4" />
+                    <path d="M3 10h18" />
+                  </svg>
+                  {formatPeriodShort({ month: workspace.month, year: workspace.year })}
+                  <svg
+                    className={styles.chev}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+                {monthPickerOpen && (
+                  <MonthPicker
+                    month={workspace.month}
+                    year={workspace.year}
+                    onSelect={handleSelectPeriod}
+                    onClose={() => setMonthPickerOpen(false)}
+                  />
+                )}
+              </div>
               <div className={styles.avatar} title="Account">
                 AM
               </div>
@@ -156,7 +205,7 @@ export default function Home() {
               style={{ marginBottom: 18, height: "auto", paddingBottom: 14, borderBottom: "1px solid var(--line)" }}
             >
               <div className={styles.crumbs}>
-                <strong>November 2026</strong>
+                <strong>{formatPeriodLong({ month: workspace.month, year: workspace.year })}</strong>
                 <svg
                   className={styles.crumbChevron}
                   viewBox="0 0 24 24"

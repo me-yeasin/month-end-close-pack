@@ -8,6 +8,7 @@ import {
   setActiveWorkspace as dbSetActive,
   deleteWorkspace as dbDeleteWorkspace,
 } from "./workspace-store";
+import { currentPeriod } from "./period";
 
 type NavItem = {
   id: View;
@@ -146,10 +147,13 @@ export function Sidebar() {
     if (!newName.trim()) return;
     setSaving(true);
     try {
+      const now = currentPeriod();
       const record = await dbCreateWorkspace({
         name: newName.trim(),
         currency: newCurrency,
         vatStatus: newVat,
+        month: now.month,
+        year: now.year,
       });
       addWorkspace(record);
       setModalOpen(false);

@@ -16,6 +16,9 @@ export interface Workspace {
   name: string;
   currency: Currency;
   vatStatus: VatStatus;
+  /** Selected period — 0-11 (Jan-Dec) and the Gregorian year. */
+  month: number;
+  year: number;
   createdAt: string;
 }
 
@@ -43,6 +46,8 @@ type UiState = {
   switchWorkspace: (id: string) => void;
   /** Remove a workspace by id; optionally pass the new active id */
   removeWorkspace: (id: string, newActiveId: string | null) => void;
+  /** Update the active workspace's selected period (month + year). */
+  setPeriod: (month: number, year: number) => void;
 };
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -92,6 +97,19 @@ export const useUiStore = create<UiState>((set, get) => ({
         activeWorkspaceId: active?.id ?? null,
         workspace: active,
       };
+    });
+  },
+
+  setPeriod: (month, year) => {
+    const { activeWorkspaceId, workspaces } = get();
+    if (!activeWorkspaceId) return;
+    // Immutable update: new array + new active object so subscribers re-render.
+    const updated = workspaces.map((w) =>
+      w.id === activeWorkspaceId ? { ...w, month, year } : w,
+    );
+    set({
+      workspaces: updated,
+      workspace: updated.find((w) => w.id === activeWorkspaceId) ?? null,
     });
   },
 }));

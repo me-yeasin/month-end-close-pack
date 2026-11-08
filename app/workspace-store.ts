@@ -11,11 +11,20 @@ import { getDb, newId, type WorkspaceRecord, type AppStateRecord } from "./db";
 // Read
 // ---------------------------------------------------------------------------
 
-/** Load all workspaces, sorted oldest → newest. */
+/** Load all workspaces, sorted oldest → newest.
+ *  Backfills the `month`/`year` period for records created before the
+ *  field existed, so the UI always receives a fully-populated record. */
 export async function loadAllWorkspaces(): Promise<WorkspaceRecord[]> {
   const db = await getDb();
   const all = await db.getAll("workspaces");
-  return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const now = new Date();
+  return all
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .map((w) => ({
+      ...w,
+      month: w.month ?? now.getMonth(),
+      year: w.year ?? now.getFullYear(),
+    }));
 }
 
 /** Load the active workspace ID from appState. Returns null if not set. */
@@ -54,6 +63,21 @@ export async function createWorkspace(
 export async function setActiveWorkspace(id: string): Promise<void> {
   const db = await getDb();
   await db.put("appState", { id: "singleton", activeWorkspaceId: id } satisfies AppStateRecord);
+}
+
+/**
+ * Patch fields on an existing workspace and persist the merged record.
+ * idb's `put` upserts by keyPath, so we read → merge → write in one
+ * transaction-free sequence (no other awaits in between).
+ */
+export async function updateWorkspace(
+  id: string,
+  patch: Partial<Omit<WorkspaceRecord, "id">>,
+): Promise<void> {
+  const db = await getDb();
+  const existing = await db.get("workspaces", id);
+  if (!existing) return;
+  await db.put("workspaces", { ...existing, ...patch, id });
 }
 
 /** Delete a workspace by ID. Returns the new active ID (or null if none left). */
