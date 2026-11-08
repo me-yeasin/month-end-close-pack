@@ -114,23 +114,25 @@
 }
 
 .brandText {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.02;
+  min-width: 0;
+  line-height: 1.2;
 }
 
 .brandText strong {
+  display: block;
   font-size: 15px;
   font-weight: 650;
   letter-spacing: -0.025em;
 }
 
+/* serif-italic "pack" inline after the bold wordmark */
 .brandText em {
-  margin-top: 1px;
   color: var(--forest-3);
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 15.5px;
   font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 .workspace {

@@ -294,8 +294,9 @@ export function Sidebar({ reviewCount = 0 }: { reviewCount?: number }) {
         >
           <span className={styles.brandMark}>M</span>
           <span className={styles.brandText}>
-            <strong>Month-End</strong>
-            <em>pack</em>
+            <strong>
+              Month-End <em>pack</em>
+            </strong>
           </span>
         </button>
 
