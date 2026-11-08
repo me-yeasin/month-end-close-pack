@@ -56,7 +56,6 @@ const NAV_ITEMS: NavItem[] = [
   {
     id: "review",
     label: "Review",
-    badge: 3,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M9 11l3 3L22 4" />
@@ -489,7 +488,6 @@ export function Sidebar() {
           </svg>
           <span>Settings</span>
         </button>
-        <span className={styles.concept}>Concept 01 · Home</span>
       </aside>
 
       {/* ---- New workspace modal ---- */}

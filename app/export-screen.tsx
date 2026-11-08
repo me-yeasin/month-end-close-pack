@@ -34,10 +34,10 @@ const PRESETS: { key: Preset; def: ExportPresetDef }[] = [
       name: "Accountant pack",
       desc: "Everything your accountant needs in one ZIP.",
       files: [
-        { icon: styles.xlsx, label: "transactions.xlsx", sub: "142 rows", core: true },
+        { icon: styles.xlsx, label: "transactions.xlsx", sub: "clean ledger", core: true },
         { icon: styles.pdf, label: "summary.pdf", sub: "1 page", core: true },
-        { icon: styles.folder, label: "receipts/", sub: "34 files", core: true },
-        { icon: styles.csv, label: "exceptions.csv", sub: "6 items", core: false },
+        { icon: styles.folder, label: "receipts/", sub: "receipt files", core: true },
+        { icon: styles.csv, label: "exceptions.csv", sub: "issue list", core: false },
         { icon: styles.json, label: "audit.json", sub: "full trail", core: false },
         { icon: "txt", label: "README.txt", sub: "what is included", core: true },
       ],
@@ -50,7 +50,7 @@ const PRESETS: { key: Preset; def: ExportPresetDef }[] = [
       name: "Spreadsheet only",
       desc: "Just the clean ledger, XLSX or CSV.",
       files: [
-        { icon: styles.xlsx, label: "transactions.xlsx", sub: "142 rows", core: true },
+        { icon: styles.xlsx, label: "transactions.xlsx", sub: "clean ledger", core: true },
         { icon: styles.csv, label: "transactions.csv", sub: "alternative", core: false },
       ],
       note: "For further analysis or a second opinion.",
@@ -62,7 +62,7 @@ const PRESETS: { key: Preset; def: ExportPresetDef }[] = [
       name: "Review only",
       desc: "The exceptions list, nothing else.",
       files: [
-        { icon: styles.csv, label: "exceptions.csv", sub: "6 items", core: true },
+        { icon: styles.csv, label: "exceptions.csv", sub: "issue list", core: true },
         { icon: styles.json, label: "audit.json", sub: "full trail", core: false },
       ],
       note: "For a quick follow-up or re-import.",
@@ -125,19 +125,24 @@ export function ExportPackScreen({
           </span>
           <div>
             <strong>
-              {blockerCount} blocker{blockerCount !== 1 ? "s" : ""} stopping the export
+              {blockerCount > 0
+                ? `${blockerCount} blocker${blockerCount !== 1 ? "s" : ""} stopping the export`
+                : "Nothing to export yet"}
             </strong>
             <p style={{ margin: "5px 0 0", color: "inherit" }}>
-              Review the missing receipts, duplicates, and uncategorised items
-              before exporting. The app will not upload anything.
+              {blockerCount > 0
+                ? "Review the missing receipts, duplicates, and uncategorised items before exporting. The app will not upload anything."
+                : "Import a bank statement and complete the review to build your pack. The app will not upload anything."}
             </p>
           </div>
-          <button
-            type="button"
-            className={`${styles.btnSecondary} ${styles.sm}`}
-          >
-            Review exceptions
-          </button>
+          {blockerCount > 0 && (
+            <button
+              type="button"
+              className={`${styles.btnSecondary} ${styles.sm}`}
+            >
+              Review exceptions
+            </button>
+          )}
         </div>
       )}
 
@@ -247,18 +252,20 @@ export function ExportPackScreen({
                   </span>
                 )}
 
-                <div className={styles.fileActions}>
-                  <span
-                    className={styles.tag}
-                    style={{
-                      background: "var(--surface-2)",
-                      color: "var(--muted)",
-                      borderColor: "var(--line)",
-                    }}
-                  >
-                    {transactionCount} rows
-                  </span>
-                </div>
+                {isXlsx && (
+                  <div className={styles.fileActions}>
+                    <span
+                      className={styles.tag}
+                      style={{
+                        background: "var(--surface-2)",
+                        color: "var(--muted)",
+                        borderColor: "var(--line)",
+                      }}
+                    >
+                      {transactionCount} rows
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -304,8 +311,8 @@ export function ExportPackScreen({
               <div>
                 <strong>Pack saved to this device.</strong>
                 <p style={{ margin: "5px 0 0", color: "inherit" }}>
-                  Month-End-Pack-November-2026.zip is ready to send to your
-                  accountant or keep for your records.
+                  Month-End-Pack.zip is ready to send to your accountant or keep
+                  for your records.
                 </p>
               </div>
               <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>

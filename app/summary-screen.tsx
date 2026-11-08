@@ -567,6 +567,23 @@ export function MonthSummaryScreen({ summary }: { summary: Summary }) {
                   </li>
                 ))}
               </ul>
+            ) : summary.totalIn === 0 && summary.totalOut === 0 ? (
+              <div
+                className={styles.callout}
+                style={{
+                  margin: -4,
+                  background: "var(--surface-2)",
+                  color: "var(--ink-2)",
+                  borderColor: "var(--line)",
+                }}
+              >
+                <span className={styles.calloutIcon}>
+                  <IconClipboard size={15} stroke={1.8} />
+                </span>
+                <p style={{ margin: 0, color: "inherit" }}>
+                  Import a bank statement to see your pack readiness.
+                </p>
+              </div>
             ) : (
               <div
                 className={styles.callout}

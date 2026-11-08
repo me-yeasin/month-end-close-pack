@@ -48,12 +48,12 @@ interface Filters {
 
 const PAGE_SIZE = 5;
 
-const FILTER_TABS: { key: string; label: string; count?: number }[] = [
+const FILTER_TABS: { key: string; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "needs_review", label: "Needs review", count: 3 },
-  { key: "missing", label: "Missing receipt", count: 2 },
-  { key: "matched", label: "Matched", count: 137 },
-  { key: "personal", label: "Personal", count: 1 },
+  { key: "needs_review", label: "Needs review" },
+  { key: "missing", label: "Missing receipt" },
+  { key: "matched", label: "Matched" },
+  { key: "personal", label: "Personal" },
 ];
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
@@ -117,11 +117,6 @@ export function TransactionsScreen({
     setDetailOpen(true);
   };
 
-  const activeTabCount = (key: string) => {
-    if (key === "all") return transactions.length;
-    return transactions.filter((t) => t.status === key).length;
-  };
-
   return (
     <div className={styles.screen}>
       {/* header */}
@@ -160,9 +155,6 @@ export function TransactionsScreen({
                 }}
               >
                 {t.label}
-                {t.count !== undefined && (
-                  <span className={styles.badge}>{t.count}</span>
-                )}
               </button>
             ))}
           </div>
