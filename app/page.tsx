@@ -321,7 +321,9 @@ export default function Home() {
           </header>
 
           {/* sub-view index bar for non-overview views */}
-          {view !== "overview" && view !== "settings" && (
+          {view !== "overview" &&
+            view !== "settings" &&
+            view !== "transactions" && (
             <div
               className={styles.topbar}
               style={{ marginBottom: 18, height: "auto", paddingBottom: 14, borderBottom: "1px solid var(--line)" }}
@@ -341,7 +343,6 @@ export default function Home() {
                   <path d="m9 18 6-6-6-6" />
                 </svg>
                 <span style={{ textTransform: "uppercase", color: "var(--muted)", fontSize: 10, fontWeight: 700, letterSpacing: "0.14em" }}>
-                  {view === "transactions" && "Ledger"}
                   {view === "receipts" && "Receipts"}
                   {view === "review" && "Review"}
                   {view === "summary" && "Summary"}
@@ -421,6 +422,7 @@ export default function Home() {
             <TransactionsScreen
               transactions={txRows}
               onEdit={() => setView("review")}
+              currency={workspace.currency}
             />
           )}
 

@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import {
-  IconCheck,
   IconReceipt,
   IconEdit,
   IconTrash,
@@ -10,8 +9,9 @@ import {
   IconSearch,
   IconChevronLeft,
   IconChevronRight,
+  IconArrowDownLeft,
+  IconArrowUpRight,
   IconX,
-  IconFile,
 } from "@tabler/icons-react";
 import styles from "./home.module.css";
 
@@ -50,10 +50,8 @@ const PAGE_SIZE = 5;
 
 const FILTER_TABS: { key: string; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "needs_review", label: "Needs review" },
-  { key: "missing", label: "Missing receipt" },
+  { key: "review", label: "Needs review" },
   { key: "matched", label: "Matched" },
-  { key: "personal", label: "Personal" },
 ];
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
@@ -63,23 +61,16 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   uncategorised: { label: "Uncategorised", cls: styles.review },
 };
 
-// deterministic small colour list for category dots
-const CAT_COLORS = [
-  "#2a6350",
-  "#7a5413",
-  "#3e6b8a",
-  "#8c3a28",
-  "#5c6459",
-  "#7c857d",
-];
-
 export function TransactionsScreen({
   transactions,
   onEdit,
+  currency = "GBP",
 }: {
   transactions: Tx[];
   onEdit?: (id: string) => void;
+  currency?: "GBP" | "EUR";
 }) {
+  const symbol = currency === "EUR" ? "€" : "£";
   const [filters, setFilters] = useState({
     search: "",
     status: "all",
@@ -197,162 +188,72 @@ export function TransactionsScreen({
           </button>
         </div>
 
-        {/* table */}
-        <div className={styles.tableWrap} style={{ marginTop: 4 }}>
-          <table className={`${styles.table} ${styles.ledger}`}>
-            <thead>
-              <tr>
-                <th className={styles.colCheck}>
-                  <span className={styles.check}>
-                    <input
-                      type="checkbox"
-                      className={styles.checkBox}
-                      checked={selectedId !== null}
-                      onChange={() =>
-                        setSelectedId((v) => (v ? null : slice[0]?.id ?? null))
-                      }
-                    />
+        {/* transaction cards */}
+        <div className={styles.txList}>
+          {slice.map((t) => {
+            const isIn = t.direction === "in";
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className={`${styles.txRow} ${t.flagged ? styles.txRowFlagged : ""}`}
+                onClick={() => openDetail(t.id)}
+              >
+                <span
+                  className={`${styles.txIcon} ${isIn ? styles.txIconIn : styles.txIconOut}`}
+                >
+                  {isIn ? (
+                    <IconArrowDownLeft size={18} stroke={2} />
+                  ) : (
+                    <IconArrowUpRight size={18} stroke={2} />
+                  )}
+                </span>
+
+                <span className={styles.txMain}>
+                  <span className={styles.txTitle}>{t.description}</span>
+                  <span className={styles.txMeta}>
+                    {t.date}
+                    {t.account && (
+                      <>
+                        <i>·</i>
+                        {t.account}
+                      </>
+                    )}
+                    {t.category && (
+                      <>
+                        <i>·</i>
+                        {t.category}
+                      </>
+                    )}
                   </span>
-                </th>
-                <th className={styles.colDate}>Date</th>
-                <th className={styles.colVendor}>Description</th>
-                <th className={styles.colCategory}>Category</th>
-                <th className={styles.colAmount}>Amount</th>
-                <th className={styles.colMatch}>Receipt match</th>
-                <th className={styles.colNote}>Note</th>
-              </tr>
-            </thead>
-            <tbody>
-              {slice.map((t) => {
-                const catColor =
-                  t.categoryId !== undefined
-                    ? CAT_COLORS[Number(t.categoryId) % CAT_COLORS.length]
-                    : undefined;
-                return (
-                  <tr
-                    key={t.id}
-                    className={`${
-                      t.selected ? styles.selected : ""
-                    } ${t.flagged ? styles.flagged : ""}`}
-                    onClick={() => openDetail(t.id)}
-                    style={{ cursor: "pointer" }}
+                  {t.flagged && t.matchMeta && (
+                    <span className={styles.txReason}>{t.matchMeta}</span>
+                  )}
+                </span>
+
+                <span className={styles.txRight}>
+                  <span
+                    className={`${styles.txAmount} ${isIn ? styles.txAmountIn : ""}`}
                   >
-                    <td className={styles.colCheck}>
-                      <span className={styles.check}>
-                        <input
-                          type="checkbox"
-                          className={styles.checkBox}
-                          checked={t.selected ?? false}
-                          onChange={() => {
-                            onEdit?.(t.id);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </span>
-                    </td>
-                    <td className={styles.dateCell}>{t.date}</td>
-                    <td>
-                      <span className={styles.vendorName}>{t.description}</span>
-                      {t.account && (
-                        <span className={styles.vendorMeta}>{t.account}</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className={styles.catCell}>
-                        <span
-                          className={`${styles.catDot} ${
-                            t.categoryId ? styles.set : ""
-                          } ${t.personal ? styles.personal : ""}`}
-                          style={catColor ? { background: catColor } : undefined}
-                        />
-                        <span
-                          className={`${styles.catName} ${
-                            t.category ? "" : styles.uncategorised
-                          }`}
-                        >
-                          {t.category ?? "Uncategorised"}
-                        </span>
-                        {t.personal && (
-                          <span className={`${styles.tag} ${styles.amber}`}>
-                            Personal
-                          </span>
-                        )}
-                        {!t.category && (
-                          <button
-                            type="button"
-                            className={styles.setCatBtn}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEdit?.(t.id);
-                            }}
-                          >
-                            Set
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className={`${styles.num} ${
-                      t.direction === "in" ? styles.inAmount : styles.outAmount
-                    }`}>
-                      {t.direction === "in"
-                        ? `+£${Math.abs(t.amount).toFixed(2)}`
-                        : `−£${Math.abs(t.amount).toFixed(2)}`}
-                    </td>
-                    <td>
-                      <div className={styles.matchCell}>
-                        <span
-                          className={`${styles.matchIcon} ${
-                            t.matchStatus === "matched"
-                              ? styles.matched
-                              : t.matchStatus === "partial"
-                              ? styles.partial
-                              : styles.unmatched
-                          }`}
-                        >
-                          {t.matchStatus === "matched" ? (
-                            <IconCheck size={12} stroke={2} />
-                          ) : t.matchStatus === "partial" ? (
-                            <IconReceipt size={12} stroke={2} />
-                          ) : (
-                            <IconX size={12} stroke={2} />
-                          )}
-                        </span>
-                        <div>
-                          <div className={styles.matchLabel}>
-                            {t.matchStatus === "matched" && "Receipt matched"}
-                            {t.matchStatus === "partial" &&
-                              "Partial match"}
-                            {t.matchStatus === "unmatched" &&
-                              "No receipt"}
-                          </div>
-                          {t.matchMeta && (
-                            <div className={styles.matchMeta}>{t.matchMeta}</div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={styles.noteCell}>
-                        <button
-                          type="button"
-                          className={`${styles.noteBtn} ${
-                            t.note ? styles.has : ""
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit?.(t.id);
-                          }}
-                          title={t.note ?? "Add note"}
-                        >
-                          <IconFile size={12} stroke={1.8} />
-                        </button>
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    {isIn ? "+" : "−"}
+                    {symbol}
+                    {Math.abs(t.amount).toFixed(2)}
+                  </span>
+                  <span
+                    className={`${styles.txStatus} ${t.flagged ? styles.txStatusWarn : styles.txStatusOk}`}
+                  >
+                    {t.flagged ? "Needs review" : "Matched"}
+                  </span>
+                </span>
+
+                <IconChevronRight
+                  className={styles.txChevron}
+                  size={16}
+                  stroke={1.8}
+                />
+              </button>
+            );
+          })}
         </div>
 
         {slice.length === 0 && (
@@ -418,22 +319,6 @@ export function TransactionsScreen({
         )}
       </div>
 
-      {/* inline skeleton while "loading" */}
-      {transactions.length === 0 && (
-        <div className={styles.section}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div className={`${styles.skeleton} ${styles.skeletonLine}`} />
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className={`${styles.skeleton} ${styles.skeletonLine}`}
-                style={{ width: "100%", height: 46 }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* detail panel */}
       {detailOpen && selectedId && (
         <>
@@ -456,6 +341,7 @@ export function TransactionsScreen({
             open={detailOpen}
             onClose={() => setDetailOpen(false)}
             onEdit={() => onEdit?.(selectedId)}
+            currency={currency}
           />
         </>
       )}
@@ -472,12 +358,15 @@ function TransactionDetail({
   open,
   onClose,
   onEdit,
+  currency = "GBP",
 }: {
   transaction: Tx;
   open: boolean;
   onClose: () => void;
   onEdit?: () => void;
+  currency?: "GBP" | "EUR";
 }) {
+  const symbol = currency === "EUR" ? "€" : "£";
   return (
     <div className={styles.detailPanel}>
       <div
@@ -555,8 +444,8 @@ function TransactionDetail({
                 }`}
               >
                 {transaction.direction === "in"
-                  ? `+£${Math.abs(transaction.amount).toFixed(2)}`
-                  : `−£${Math.abs(transaction.amount).toFixed(2)}`}
+                  ? `+${symbol}${Math.abs(transaction.amount).toFixed(2)}`
+                  : `−${symbol}${Math.abs(transaction.amount).toFixed(2)}`}
               </span>
             </div>
             <div className={styles.detailField}>

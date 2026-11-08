@@ -4149,6 +4149,170 @@
 
 
 
+/* --------------------------------------------------------------------- */
+/* Transactions — premium card list                                      */
+/* --------------------------------------------------------------------- */
+
+.txList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.txRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.txRow:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+  box-shadow: 0 14px 30px -24px rgba(24, 36, 30, 0.4);
+  transform: translateY(-1px);
+}
+
+.txRowFlagged {
+  border-color: #ecd9b0;
+}
+
+.txIcon {
+  flex: 0 0 auto;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+}
+
+.txIconIn {
+  background: #e1ede3;
+  color: #2d6a47;
+}
+
+.txIconOut {
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+
+.txIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.txMain {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.txTitle {
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.txMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.txMeta i {
+  color: var(--line-strong);
+  font-style: normal;
+}
+
+.txReason {
+  color: var(--amber-ink);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.txRight {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+}
+
+.txAmount {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.txAmountIn {
+  color: var(--forest-3);
+}
+
+.txStatus {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.txStatusOk {
+  background: var(--sage);
+  color: var(--forest);
+}
+
+.txStatusWarn {
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+
+.txChevron {
+  flex: 0 0 auto;
+  color: var(--line-strong);
+}
+
+@media (max-width: 560px) {
+  .txRow {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .txIcon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .txChevron {
+    display: none;
+  }
+}
+
 /* Skeleton */
 
 .skeleton {
