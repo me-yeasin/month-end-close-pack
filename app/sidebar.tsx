@@ -8,7 +8,8 @@ import {
   setActiveWorkspace as dbSetActive,
   deleteWorkspace as dbDeleteWorkspace,
 } from "./workspace-store";
-import { currentPeriod } from "./period";
+import { currentPeriod, formatPeriodShort } from "./period";
+import { MonthPicker } from "./month-picker";
 
 type NavItem = {
   id: View;
@@ -86,7 +87,14 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export function Sidebar({ reviewCount = 0 }: { reviewCount?: number }) {
+export function Sidebar({
+  reviewCount = 0,
+  onSelectPeriod,
+}: {
+  reviewCount?: number;
+  /** Commit a new month/year — wired to the same handler as the topbar picker. */
+  onSelectPeriod?: (month: number, year: number) => void;
+}) {
   const open = useUiStore((state) => state.sidebarOpen);
   const closeSidebar = useUiStore((state) => state.closeSidebar);
   const view = useUiStore((state) => state.view);
@@ -103,6 +111,10 @@ export function Sidebar({ reviewCount = 0 }: { reviewCount?: number }) {
   // workspace picker state
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+
+  // month picker state (visible only inside the mobile drawer)
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const monthWrapRef = useRef<HTMLDivElement>(null);
 
   // delete confirmation state
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -127,6 +139,18 @@ export function Sidebar({ reviewCount = 0 }: { reviewCount?: number }) {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [pickerOpen]);
+
+  // Close month picker when clicking outside (mobile drawer)
+  useEffect(() => {
+    if (!monthPickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (monthWrapRef.current && !monthWrapRef.current.contains(e.target as Node)) {
+        setMonthPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [monthPickerOpen]);
 
   const openModal = () => {
     setPickerOpen(false);
@@ -405,6 +429,46 @@ export function Sidebar({ reviewCount = 0 }: { reviewCount?: number }) {
                   New workspace
                 </button>
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* Month/year picker — lives in the drawer on small screens only */}
+        <div className={styles.drawerMonth} ref={monthWrapRef}>
+          <span className={styles.wsLabel}>Period</span>
+          <div className={styles.drawerMonthWrap}>
+            <button
+              type="button"
+              className={styles.drawerMonthBtn}
+              onClick={() => setMonthPickerOpen((v) => !v)}
+              aria-haspopup="dialog"
+              aria-expanded={monthPickerOpen}
+              aria-label={`Selected period ${workspace ? formatPeriodShort({ month: workspace.month, year: workspace.year }) : ""}. Change month or year.`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M16 2v4" />
+                <path d="M8 2v4" />
+                <path d="M3 10h18" />
+              </svg>
+              {workspace
+                ? formatPeriodShort({ month: workspace.month, year: workspace.year })
+                : "—"}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={styles.chev}>
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+
+            {monthPickerOpen && workspace && (
+              <MonthPicker
+                month={workspace.month}
+                year={workspace.year}
+                onSelect={(month, year) => {
+                  onSelectPeriod?.(month, year);
+                  setMonthPickerOpen(false);
+                }}
+                onClose={() => setMonthPickerOpen(false)}
+              />
             )}
           </div>
         </div>

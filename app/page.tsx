@@ -354,7 +354,7 @@ export default function Home() {
 
   return (
     <div className={styles.shell}>
-      <Sidebar reviewCount={flaggedCount} />
+      <Sidebar reviewCount={flaggedCount} onSelectPeriod={handleSelectPeriod} />
 
       {/* ================= MAIN ================= */}
       <main className={styles.main} id="top">
