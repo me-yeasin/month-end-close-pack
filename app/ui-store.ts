@@ -6,7 +6,8 @@ export type View =
   | "receipts"
   | "review"
   | "summary"
-  | "export";
+  | "export"
+  | "settings";
 
 export type Currency = "GBP" | "EUR";
 export type VatStatus = "registered" | "unregistered";

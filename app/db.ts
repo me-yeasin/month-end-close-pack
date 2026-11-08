@@ -40,6 +40,30 @@ export interface AppStateRecord {
   activeWorkspaceId: string | null;
 }
 
+/** A model available under a configured AI provider. */
+export interface AiModelRecord {
+  id: string;   // model id sent to the provider API
+  name: string; // display name (user-editable)
+}
+
+/** A user-configured AI provider (BYO key, OpenAI-compatible). */
+export interface AiProviderRecord {
+  id: string;
+  name: string;    // provider display name
+  baseUrl: string; // e.g. https://api.openai.com/v1
+  apiKey: string;  // stored locally on this device
+  models: AiModelRecord[];
+  createdAt: string;
+}
+
+/** Singleton row holding all AI providers + the active selection. */
+export interface AiConfigRecord {
+  id: "singleton";
+  providers: AiProviderRecord[];
+  activeProviderId: string | null;
+  activeModelId: string | null;
+}
+
 interface MonthEndPackDB extends DBSchema {
   workspaces: {
     value: WorkspaceRecord;
@@ -49,6 +73,10 @@ interface MonthEndPackDB extends DBSchema {
     value: AppStateRecord;
     key: string;
   };
+  aiConfig: {
+    value: AiConfigRecord;
+    key: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +84,7 @@ interface MonthEndPackDB extends DBSchema {
 // ---------------------------------------------------------------------------
 
 const DB_NAME = "month-end-pack";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 // ---------------------------------------------------------------------------
 // Simple ID generator — no dependency needed for UUID-like strings
@@ -89,6 +117,11 @@ export async function getDb(): Promise<IDBPDatabase<MonthEndPackDB>> {
       // Create appState store if it does not exist
       if (!db.objectStoreNames.contains("appState")) {
         db.createObjectStore("appState", { keyPath: "id" });
+      }
+
+      // Create aiConfig store (v3) if it does not exist
+      if (!db.objectStoreNames.contains("aiConfig")) {
+        db.createObjectStore("aiConfig", { keyPath: "id" });
       }
 
       // Remove the old v1 "workspace" store (migration complete)

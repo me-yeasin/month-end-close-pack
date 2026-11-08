@@ -462,7 +462,12 @@ export function Sidebar() {
           </button>
         </div>
 
-        <button type="button" className={styles.navItem}>
+        <button
+          type="button"
+          className={`${styles.navItem} ${view === "settings" ? styles.active : ""}`}
+          onClick={() => navigate("settings")}
+          aria-current={view === "settings" ? "page" : undefined}
+        >
           <svg
             viewBox="0 0 24 24"
             fill="none"

@@ -10,6 +10,7 @@ import { ReceiptReviewScreen } from "./receipt-review-screen";
 import { ExceptionsScreen } from "./exceptions-screen";
 import { MonthSummaryScreen } from "./summary-screen";
 import { ExportPackScreen } from "./export-screen";
+import { SettingsScreen } from "./settings-screen";
 import { useUiStore } from "./ui-store";
 import { MonthPicker } from "./month-picker";
 import { AddFilesModal } from "./add-files-modal";
@@ -29,6 +30,7 @@ const VIEW_LABELS: Record<string, string> = {
   review: "Review",
   summary: "Summary",
   export: "Export",
+  settings: "Settings",
 };
 
 export default function Home() {
@@ -203,7 +205,7 @@ export default function Home() {
           </header>
 
           {/* sub-view index bar for non-overview views */}
-          {view !== "overview" && (
+          {view !== "overview" && view !== "settings" && (
             <div
               className={styles.topbar}
               style={{ marginBottom: 18, height: "auto", paddingBottom: 14, borderBottom: "1px solid var(--line)" }}
@@ -1151,6 +1153,8 @@ export default function Home() {
               }}
             />
           )}
+
+          {view === "settings" && <SettingsScreen />}
         </div>
       </main>
 
