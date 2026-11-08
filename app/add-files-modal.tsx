@@ -199,9 +199,12 @@ function UploadSection({
 export function AddFilesModal({
   open,
   onClose,
+  onAdd,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Hand the chosen bank statement files to the app for processing. */
+  onAdd?: (bankFiles: File[]) => void;
 }) {
   const [bankFiles, setBankFiles] = useState<File[]>([]);
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
@@ -355,7 +358,10 @@ export function AddFilesModal({
           <button
             type="button"
             className={styles.btnPrimary}
-            onClick={onClose}
+            onClick={() => {
+              if (bankFiles.length > 0) onAdd?.(bankFiles);
+              onClose();
+            }}
             disabled={totalCount === 0}
           >
             {totalCount === 0

@@ -39,11 +39,10 @@ interface Exception {
 
 const FILTER_TABS: { key: string; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "needs_review", label: "Needs review" },
-  { key: "missing_receipt", label: "Missing receipt" },
-  { key: "unmatched_receipt", label: "Unmatched receipt" },
-  { key: "duplicate", label: "Duplicates" },
-  { key: "low_confidence", label: "Low confidence" },
+  { key: "possible_personal", label: "Personal" },
+  { key: "duplicate_transaction", label: "Duplicates" },
+  { key: "foreign_currency", label: "Foreign currency" },
+  { key: "uncategorised", label: "Needs a look" },
 ];
 
 const GROUP: Record<ExType, { label: string; icon: string }> = {
@@ -85,25 +84,11 @@ export function ExceptionsScreen({
     () =>
       filter === "all"
         ? exceptions
-        : filter === "duplicate"
-        ? exceptions.filter((e) =>
-            e.type === "duplicate_transaction" || e.type === "duplicate_receipt",
-          )
         : exceptions.filter((e) => e.type === filter),
     [exceptions, filter],
   );
 
   const selected = bulk.length;
-  const counts = {
-    needs_review: exceptions.filter(
-      (e) => e.type === "low_confidence",
-    ).length,
-    missing: exceptions.filter((e) => e.type === "missing_receipt").length,
-    unmatched: exceptions.filter((e) => e.type === "unmatched_receipt").length,
-    duplicate: exceptions.filter(
-      (e) => e.type === "duplicate_transaction" || e.type === "duplicate_receipt",
-    ).length,
-  };
 
   const next = () => {
     const remaining = filtered.filter((e) => !e.checked);
@@ -144,11 +129,7 @@ export function ExceptionsScreen({
               const count =
                 t.key === "all"
                   ? exceptions.length
-                  : t.key === "duplicate"
-                  ? counts.duplicate
-                  : t.key === "needs_review"
-                  ? counts.needs_review
-                  : counts[t.key as keyof typeof counts] ?? 0;
+                  : exceptions.filter((e) => e.type === t.key).length;
               return (
                 <button
                   key={t.key}
@@ -205,16 +186,31 @@ export function ExceptionsScreen({
           style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line)" }}
         >
           <div className={styles.metaItem}>
-            <strong>{counts.needs_review}</strong> need review
+            <strong>
+              {exceptions.filter((e) => e.type === "possible_personal").length}
+            </strong>{" "}
+            personal
           </div>
           <div className={styles.metaItem}>
-            <strong>{counts.missing}</strong> missing receipt
+            <strong>
+              {
+                exceptions.filter((e) => e.type === "duplicate_transaction")
+                  .length
+              }
+            </strong>{" "}
+            duplicates
           </div>
           <div className={styles.metaItem}>
-            <strong>{counts.unmatched}</strong> unmatched receipt
+            <strong>
+              {exceptions.filter((e) => e.type === "foreign_currency").length}
+            </strong>{" "}
+            foreign currency
           </div>
           <div className={styles.metaItem}>
-            <strong>{counts.duplicate}</strong> duplicates
+            <strong>
+              {exceptions.filter((e) => e.type === "uncategorised").length}
+            </strong>{" "}
+            need a look
           </div>
         </div>
       </div>

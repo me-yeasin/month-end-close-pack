@@ -12,6 +12,7 @@ import { ExportPackScreen } from "./export-screen";
 import { SettingsScreen } from "./settings-screen";
 import { OverviewScreen } from "./overview-screen";
 import { useAiStore, loadAiConfig } from "./ai-store";
+import { useImportStore } from "./import-store";
 import { useUiStore } from "./ui-store";
 import { MonthPicker } from "./month-picker";
 import { AddFilesModal } from "./add-files-modal";
@@ -33,6 +34,15 @@ const VIEW_LABELS: Record<string, string> = {
   export: "Export",
   settings: "Settings",
 };
+
+function formatTxDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(y, m - 1, d).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+}
 
 export default function Home() {
   const view = useUiStore((state) => state.view);
@@ -59,6 +69,27 @@ export default function Home() {
       p.id === aiActiveProviderId &&
       p.models.some((m) => m.id === aiActiveModelId),
   );
+
+  // Bank import state (real transactions + job progress)
+  const importTransactions = useImportStore((state) => state.transactions);
+  const importJob = useImportStore((state) => state.job);
+  const hydrateImport = useImportStore((state) => state.hydrate);
+  const startImport = useImportStore((state) => state.startImport);
+  const activeAiProvider =
+    aiProviders.find((p) => p.id === aiActiveProviderId) ?? null;
+
+  const handleAddFiles = (bankFiles: File[]) => {
+    if (!workspace || !activeAiProvider || !aiActiveModelId) return;
+    void startImport(
+      bankFiles,
+      { id: workspace.id, month: workspace.month, year: workspace.year },
+      {
+        baseUrl: activeAiProvider.baseUrl,
+        apiKey: activeAiProvider.apiKey,
+        model: aiActiveModelId,
+      },
+    );
+  };
 
   // Close the month picker when clicking outside the trigger + popover
   useEffect(() => {
@@ -103,6 +134,12 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load the active month's imported transactions + latest job.
+  useEffect(() => {
+    if (!workspace) return;
+    void hydrateImport(workspace.id, workspace.month, workspace.year);
+  }, [workspace?.id, workspace?.month, workspace?.year, hydrateImport]);
+
   // Avoid flashing onboarding on page load while we check IndexedDB
   if (loading) return null;
 
@@ -123,9 +160,55 @@ export default function Home() {
     );
   }
 
+  const txRows = importTransactions.map((t) => ({
+    id: t.id,
+    date: formatTxDate(t.date),
+    description: t.description,
+    account: t.account || undefined,
+    amount: t.amount,
+    direction: t.direction,
+    category: undefined,
+    categoryId: undefined,
+    vat: undefined,
+    note: undefined,
+    personal: false,
+    matchStatus: (t.flag ? "partial" : "matched") as
+      | "matched"
+      | "partial"
+      | "unmatched",
+    matchMeta: t.flag?.reason,
+    status: (t.flag ? "review" : "matched") as
+      | "matched"
+      | "missing_receipt"
+      | "review"
+      | "uncategorised",
+    selected: false,
+    flagged: Boolean(t.flag),
+  }));
+
+  const reviewExceptions = importTransactions
+    .filter((t) => t.flag)
+    .map((t) => ({
+      id: t.id,
+      type: t.flag!.type as
+        | "possible_personal"
+        | "duplicate_transaction"
+        | "foreign_currency"
+        | "uncategorised",
+      severity: t.flag!.severity,
+      message: t.description,
+      sub: t.flag!.reason,
+      category: undefined,
+      value: t.amount,
+      valueLabel: undefined,
+      checked: false,
+    }));
+
+  const flaggedCount = reviewExceptions.length;
+
   return (
     <div className={styles.shell}>
-      <Sidebar />
+      <Sidebar reviewCount={flaggedCount} />
 
       {/* ================= MAIN ================= */}
       <main className={styles.main} id="top">
@@ -324,13 +407,19 @@ export default function Home() {
               <OverviewScreen
                 aiConfigured={aiConfigured}
                 onAddFiles={() => setAddFilesOpen(true)}
+                onReview={() => setView("review")}
+                onTransactions={() => setView("transactions")}
+                onExport={() => setView("export")}
+                transactions={importTransactions}
+                job={importJob}
+                currency={workspace.currency}
               />
             </>
           )}
 
           {view === "transactions" && (
             <TransactionsScreen
-              transactions={[]}
+              transactions={txRows}
               onEdit={() => setView("review")}
             />
           )}
@@ -346,7 +435,7 @@ export default function Home() {
 
           {view === "review" && (
             <ExceptionsScreen
-              exceptions={[]}
+              exceptions={reviewExceptions}
               onAcceptSuggested={() => {}}
               onSetCategory={() => {}}
               onMarkPersonal={() => {}}
@@ -396,7 +485,11 @@ export default function Home() {
         </div>
       </main>
 
-      <AddFilesModal open={addFilesOpen} onClose={() => setAddFilesOpen(false)} />
+      <AddFilesModal
+        open={addFilesOpen}
+        onClose={() => setAddFilesOpen(false)}
+        onAdd={handleAddFiles}
+      />
     </div>
   );
 }

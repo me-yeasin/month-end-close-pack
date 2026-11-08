@@ -64,6 +64,50 @@ export interface AiConfigRecord {
   activeModelId: string | null;
 }
 
+/** A normalized bank transaction for a workspace month. */
+export interface TransactionRecord {
+  id: string;
+  workspaceId: string;
+  month: number; // 0-11
+  year: number;
+  date: string; // ISO date (YYYY-MM-DD)
+  description: string;
+  amount: number; // signed: positive = money in
+  direction: "in" | "out";
+  account: string;
+  sourceFile: string;
+  originalRow: number;
+  /** Stable identity for de-duplication across files. */
+  fingerprint: string;
+  /** AI flag, if this transaction was flagged for review. */
+  flag: {
+    type: string;
+    severity: "high" | "medium" | "low";
+    reason: string;
+  } | null;
+  createdAt: string;
+}
+
+/** A bank-import job (one per upload batch). */
+export interface ImportJobRecord {
+  id: string;
+  workspaceId: string;
+  month: number;
+  year: number;
+  status: "queued" | "processing" | "done" | "failed";
+  stage: string; // reading | parsing | analyzing | merging | done | failed
+  message: string;
+  files: { name: string; size: number }[];
+  totalTransactions: number;
+  totalFlagged: number;
+  chunkDone: number;
+  chunkTotal: number;
+  failedBatches?: number;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface MonthEndPackDB extends DBSchema {
   workspaces: {
     value: WorkspaceRecord;
@@ -77,6 +121,16 @@ interface MonthEndPackDB extends DBSchema {
     value: AiConfigRecord;
     key: string;
   };
+  transactions: {
+    value: TransactionRecord;
+    key: string;
+    indexes: { byWorkspace: string };
+  };
+  importJobs: {
+    value: ImportJobRecord;
+    key: string;
+    indexes: { byWorkspace: string };
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +138,7 @@ interface MonthEndPackDB extends DBSchema {
 // ---------------------------------------------------------------------------
 
 const DB_NAME = "month-end-pack";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 // ---------------------------------------------------------------------------
 // Simple ID generator — no dependency needed for UUID-like strings
@@ -122,6 +176,18 @@ export async function getDb(): Promise<IDBPDatabase<MonthEndPackDB>> {
       // Create aiConfig store (v3) if it does not exist
       if (!db.objectStoreNames.contains("aiConfig")) {
         db.createObjectStore("aiConfig", { keyPath: "id" });
+      }
+
+      // Create transactions store (v4)
+      if (!db.objectStoreNames.contains("transactions")) {
+        const store = db.createObjectStore("transactions", { keyPath: "id" });
+        store.createIndex("byWorkspace", "workspaceId");
+      }
+
+      // Create importJobs store (v4)
+      if (!db.objectStoreNames.contains("importJobs")) {
+        const store = db.createObjectStore("importJobs", { keyPath: "id" });
+        store.createIndex("byWorkspace", "workspaceId");
       }
 
       // Remove the old v1 "workspace" store (migration complete)

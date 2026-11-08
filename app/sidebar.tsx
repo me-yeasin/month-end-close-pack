@@ -86,7 +86,7 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ reviewCount = 0 }: { reviewCount?: number }) {
   const open = useUiStore((state) => state.sidebarOpen);
   const closeSidebar = useUiStore((state) => state.closeSidebar);
   const view = useUiStore((state) => state.view);
@@ -408,21 +408,24 @@ export function Sidebar() {
         </div>
 
         <nav className={styles.nav} aria-label="Main">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`${styles.navItem} ${view === item.id ? styles.active : ""}`}
-              onClick={() => navigate(item.id)}
-              aria-current={view === item.id ? "page" : undefined}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-              {item.badge != null && (
-                <span className={styles.navBadge}>{item.badge}</span>
-              )}
-            </button>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            const badge = item.id === "review" ? reviewCount : item.badge;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={`${styles.navItem} ${view === item.id ? styles.active : ""}`}
+                onClick={() => navigate(item.id)}
+                aria-current={view === item.id ? "page" : undefined}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+                {badge != null && badge > 0 && (
+                  <span className={styles.navBadge}>{badge}</span>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
         <div className={styles.sidebarSpacer} />
