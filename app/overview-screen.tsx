@@ -145,36 +145,54 @@ export function OverviewScreen({
       ? Math.round(((transactionCount - flaggedCount) / transactionCount) * 100)
       : 0;
 
-  const matchStatus = !hasData
-    ? "Not yet"
-    : flaggedCount > 0
-      ? "To review"
-      : "All clear";
-  const matchSub = !hasData
-    ? "Nothing to review"
-    : flaggedCount > 0
-      ? `${flaggedCount} flagged`
-      : `${transactionCount} transactions`;
-  const matchClass = !hasData
-    ? styles.locked
-    : flaggedCount > 0
-      ? styles.active
-      : styles.done;
-  const matchBar = !hasData ? 0 : flaggedCount > 0 ? reviewPct : 100;
+  // while any file is still being processed, downstream cards must not show
+  // "settled" states — parsed transactions exist in the store before the AI
+  // analysis finishes, so hasData alone is not enough here.
+  const pipelineBusy = isProcessing || receiptProcessing;
 
-  const exportStatus = !hasData
-    ? "Not yet"
-    : flaggedCount > 0
-      ? "Locked"
-      : "Ready";
-  const exportSub = !hasData
-    ? "Unlocks when ready"
-    : flaggedCount > 0
+  const matchStatus = isProcessing
+    ? "Processing"
+    : !hasData
+      ? "Not yet"
+      : flaggedCount > 0
+        ? "To review"
+        : "All clear";
+  const matchSub = isProcessing
+    ? (job?.message || "Analyzing your transactions…")
+    : !hasData
+      ? "Nothing to review"
+      : flaggedCount > 0
+        ? `${flaggedCount} flagged`
+        : `${transactionCount} transactions`;
+  const matchClass = isProcessing
+    ? styles.active
+    : !hasData
+      ? styles.locked
+      : flaggedCount > 0
+        ? styles.active
+        : styles.done;
+  const matchBar = isProcessing ? jobProgress : !hasData ? 0 : flaggedCount > 0 ? reviewPct : 100;
+
+  const exportStatus = pipelineBusy
+    ? "Processing"
+    : !hasData
+      ? "Not yet"
+      : flaggedCount > 0
+        ? "Locked"
+        : "Ready";
+  const exportSub = pipelineBusy
+    ? "Waiting for files to finish"
+    : !hasData
+      ? "Unlocks when ready"
+      : flaggedCount > 0
       ? `${flaggedCount} to review`
       : "All clear";
-  const exportClass =
-    hasData && flaggedCount === 0 ? styles.done : styles.locked;
-  const exportBar = hasData && flaggedCount === 0 ? 100 : 0;
+  const exportClass = pipelineBusy
+    ? styles.active
+    : hasData && flaggedCount === 0
+      ? styles.done
+      : styles.locked;
+  const exportBar = pipelineBusy ? 0 : hasData && flaggedCount === 0 ? 100 : 0;
 
   let heroTitle: React.ReactNode;
   let heroText: string;
@@ -525,51 +543,117 @@ export function OverviewScreen({
         <article className={`${styles.step} ${matchClass}`}>
           <div className={styles.stepTop}>
             <span className={styles.stepIco}>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.7}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7L11 6" />
-                <path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7L13 18" />
-              </svg>
+              {isProcessing ? (
+                <svg
+                  className={styles.spin}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 12a9 9 0 1 1-6.2-8.5" />
+                </svg>
+              ) : (
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.7}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7L11 6" />
+                  <path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7L13 18" />
+                </svg>
+              )}
             </span>
-            <span className={styles.stepStatus}>{matchStatus}</span>
+            <span className={styles.stepStatus}>
+              {isProcessing && (
+                <svg
+                  className={styles.spin}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.4}
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 12a9 9 0 1 1-6.2-8.5" />
+                </svg>
+              )}
+              {matchStatus}
+            </span>
           </div>
           <div className={styles.stepTitle}>Match &amp; review</div>
           <div className={styles.stepSub}>{matchSub}</div>
           <div className={styles.stepBar}>
-            <span style={{ width: `${matchBar}%` }} />
+            <span
+              className={isProcessing ? styles.stepBarBusy : undefined}
+              style={{ width: `${matchBar}%` }}
+            />
           </div>
         </article>
 
         <article className={`${styles.step} ${exportClass}`}>
           <div className={styles.stepTop}>
             <span className={styles.stepIco}>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.7}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
-                <path d="m4.5 7.5 7.5 4 7.5-4" />
-                <path d="M12 12v9" />
-              </svg>
+              {pipelineBusy ? (
+                <svg
+                  className={styles.spin}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 12a9 9 0 1 1-6.2-8.5" />
+                </svg>
+              ) : (
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.7}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
+                  <path d="m4.5 7.5 7.5 4 7.5-4" />
+                  <path d="M12 12v9" />
+                </svg>
+              )}
             </span>
-            <span className={styles.stepStatus}>{exportStatus}</span>
+            <span className={styles.stepStatus}>
+              {pipelineBusy && (
+                <svg
+                  className={styles.spin}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.4}
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 12a9 9 0 1 1-6.2-8.5" />
+                </svg>
+              )}
+              {exportStatus}
+            </span>
           </div>
           <div className={styles.stepTitle}>Export pack</div>
           <div className={styles.stepSub}>{exportSub}</div>
           <div className={styles.stepBar}>
-            <span style={{ width: `${exportBar}%` }} />
+            <span
+              className={pipelineBusy ? styles.stepBarBusy : undefined}
+              style={{ width: `${exportBar}%` }}
+            />
           </div>
         </article>
       </section>
@@ -584,17 +668,27 @@ export function OverviewScreen({
                 <div>
                   <span className={styles.eyebrowSm}>Needs your attention</span>
                   <h2>
-                    {flaggedCount > 0
-                      ? `${flaggedCount} item${flaggedCount === 1 ? "" : "s"} to review`
-                      : "Nothing to review"}
+                    {isProcessing
+                      ? "Analyzing your statement"
+                      : flaggedCount > 0
+                        ? `${flaggedCount} item${flaggedCount === 1 ? "" : "s"} to review`
+                        : "Nothing to review"}
                   </h2>
                 </div>
-                {flaggedCount > 0 && (
+                {!isProcessing && flaggedCount > 0 && (
                   <span className={styles.countPill}>{flaggedCount}</span>
                 )}
               </div>
 
-              {flaggedCount > 0 ? (
+              {isProcessing ? (
+                <div className={styles.empty} style={{ padding: "24px 12px" }}>
+                  <div className={styles.emptyTitle}>Working…</div>
+                  <div className={styles.emptyDesc}>
+                    Flags appear here as your statement is analyzed. You can
+                    keep using the app meanwhile.
+                  </div>
+                </div>
+              ) : flaggedCount > 0 ? (
                 <>
                   {flagged.slice(0, 3).map((t) => (
                     <div key={t.id} className={styles.exception}>
@@ -750,43 +844,71 @@ export function OverviewScreen({
                   <h2>This month so far</h2>
                 </div>
               </div>
-              <div className={styles.moneyRow}>
-                <span className={styles.label}>Money in</span>
-                <span className={styles.value}>
-                  <strong>
-                    {currencySymbol}
-                    {totalIn.toLocaleString("en-GB", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </strong>
-                </span>
-              </div>
-              <div className={styles.moneyRow}>
-                <span className={styles.label}>Money out</span>
-                <span className={styles.value}>
-                  <strong>
-                    {currencySymbol}
-                    {totalOut.toLocaleString("en-GB", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </strong>
-                </span>
-              </div>
-              <div className={`${styles.moneyRow} ${styles.net}`}>
-                <span className={styles.label}>Net</span>
-                <span className={styles.value}>
-                  <strong>
-                    {net < 0 ? "−" : ""}
-                    {currencySymbol}
-                    {Math.abs(net).toLocaleString("en-GB", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </strong>
-                </span>
-              </div>
+              {isProcessing ? (
+                <>
+                  <div className={styles.moneyRow}>
+                    <span className={styles.label}>Money in</span>
+                    <span className={styles.value}>
+                      <strong>—</strong>
+                    </span>
+                  </div>
+                  <div className={styles.moneyRow}>
+                    <span className={styles.label}>Money out</span>
+                    <span className={styles.value}>
+                      <strong>—</strong>
+                    </span>
+                  </div>
+                  <div className={`${styles.moneyRow} ${styles.net}`}>
+                    <span className={styles.label}>Net</span>
+                    <span className={styles.value}>
+                      <strong>—</strong>
+                    </span>
+                  </div>
+                  <p className={styles.sumNote}>
+                    Totals appear once your statement has been fully analyzed.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className={styles.moneyRow}>
+                    <span className={styles.label}>Money in</span>
+                    <span className={styles.value}>
+                      <strong>
+                        {currencySymbol}
+                        {totalIn.toLocaleString("en-GB", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </strong>
+                    </span>
+                  </div>
+                  <div className={styles.moneyRow}>
+                    <span className={styles.label}>Money out</span>
+                    <span className={styles.value}>
+                      <strong>
+                        {currencySymbol}
+                        {totalOut.toLocaleString("en-GB", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </strong>
+                    </span>
+                  </div>
+                  <div className={`${styles.moneyRow} ${styles.net}`}>
+                    <span className={styles.label}>Net</span>
+                    <span className={styles.value}>
+                      <strong>
+                        {net < 0 ? "−" : ""}
+                        {currencySymbol}
+                        {Math.abs(net).toLocaleString("en-GB", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </strong>
+                    </span>
+                  </div>
+                </>
+              )}
             </section>
 
             <section className={`${styles.card} ${styles.pack}`} id="pack">
