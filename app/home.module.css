@@ -4420,6 +4420,21 @@
   border: 1px solid #c3d6c0;
 }
 
+.callout.danger {
+  background: var(--red-soft);
+  color: var(--red-ink);
+  border: 1px solid #e3bcb3;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 .calloutIcon {
   flex: 0 0 auto;
   width: 18px;
@@ -6093,6 +6108,10 @@
 
 .sumTotalNet {
   color: var(--forest-3);
+}
+
+.sumTotalWarn {
+  color: var(--red-ink);
 }
 
 /* attention counts — auto-fit cards, no fixed widths */

@@ -1,24 +1,22 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   IconFiles,
   IconFileTypePdf,
   IconFileZip,
   IconFileTypeCsv,
   IconJson,
-  IconCloudDownload,
-  IconCheck,
   IconAlertTriangle,
+  IconCheck,
+  IconArrowRight,
+  IconDownload,
   IconLoader2,
-  IconPackage,
-  IconTrash,
-  IconPlus,
 } from "@tabler/icons-react";
 import styles from "./home.module.css";
 
 type Preset = "accountant" | "spreadsheet" | "review";
-type ExportStatus = "idle" | "preparing" | "packaging" | "done" | "error";
+type BuildStatus = "idle" | "building" | "done" | "error";
 
 interface ExportPresetDef {
   name: string;
@@ -34,11 +32,11 @@ const PRESETS: { key: Preset; def: ExportPresetDef }[] = [
       name: "Accountant pack",
       desc: "Everything your accountant needs in one ZIP.",
       files: [
-        { icon: styles.xlsx, label: "transactions.xlsx", sub: "clean ledger", core: true },
-        { icon: styles.pdf, label: "summary.pdf", sub: "1 page", core: true },
-        { icon: styles.folder, label: "receipts/", sub: "receipt files", core: true },
-        { icon: styles.csv, label: "exceptions.csv", sub: "issue list", core: false },
-        { icon: styles.json, label: "audit.json", sub: "full trail", core: false },
+        { icon: "xlsx", label: "transactions.xlsx", sub: "clean ledger", core: true },
+        { icon: "pdf", label: "summary.pdf", sub: "1 page", core: true },
+        { icon: "folder", label: "receipts/", sub: "receipt files", core: true },
+        { icon: "csv", label: "exceptions.csv", sub: "issue list", core: false },
+        { icon: "json", label: "audit.json", sub: "full trail", core: false },
         { icon: "txt", label: "README.txt", sub: "what is included", core: true },
       ],
       note: "Best for sending to an accountant or bookkeeper.",
@@ -50,8 +48,8 @@ const PRESETS: { key: Preset; def: ExportPresetDef }[] = [
       name: "Spreadsheet only",
       desc: "Just the clean ledger, XLSX or CSV.",
       files: [
-        { icon: styles.xlsx, label: "transactions.xlsx", sub: "clean ledger", core: true },
-        { icon: styles.csv, label: "transactions.csv", sub: "alternative", core: false },
+        { icon: "xlsx", label: "transactions.xlsx", sub: "clean ledger", core: true },
+        { icon: "csv", label: "transactions.csv", sub: "alternative", core: false },
       ],
       note: "For further analysis or a second opinion.",
     },
@@ -62,45 +60,100 @@ const PRESETS: { key: Preset; def: ExportPresetDef }[] = [
       name: "Review only",
       desc: "The exceptions list, nothing else.",
       files: [
-        { icon: styles.csv, label: "exceptions.csv", sub: "issue list", core: true },
-        { icon: styles.json, label: "audit.json", sub: "full trail", core: false },
+        { icon: "csv", label: "exceptions.csv", sub: "issue list", core: true },
+        { icon: "json", label: "audit.json", sub: "full trail", core: false },
       ],
       note: "For a quick follow-up or re-import.",
     },
   },
 ];
 
-interface ExportScreenProps {
-  ready: boolean;
-  transactionCount: number;
-  receiptCount: number;
-  blockerCount: number;
-  onExport: (preset: Preset) => void;
-}
+const FILE_ICONS: Record<string, React.ComponentType<{ size: number; stroke: number }>> = {
+  xlsx: IconFiles,
+  pdf: IconFileTypePdf,
+  csv: IconFileTypeCsv,
+  json: IconJson,
+  folder: IconFileZip,
+  txt: IconFiles,
+};
 
 export function ExportPackScreen({
   ready,
-  transactionCount,
-  receiptCount,
-  blockerCount,
+  hasData = false,
+  transactionCount = 0,
+  receiptCount = 0,
+  blockerCount = 0,
+  onReview,
   onExport,
-}: ExportScreenProps) {
+}: {
+  /** True when the month is reviewed and the pack can be built. */
+  ready: boolean;
+  /** False when nothing has been imported yet. */
+  hasData?: boolean;
+  transactionCount?: number;
+  receiptCount?: number;
+  blockerCount?: number;
+  /** Jump to the review screen (shown while blockers remain). */
+  onReview?: () => void;
+  /** Build the pack — resolves (optionally with the file name) when the ZIP is saved. */
+  onExport?: (preset: Preset) => Promise<string | void> | string | void;
+}) {
   const [preset, setPreset] = useState<Preset>("accountant");
-  const [status, setStatus] = useState<ExportStatus>("idle");
+  const [status, setStatus] = useState<BuildStatus>("idle");
+  const [errorText, setErrorText] = useState<string | null>(null);
+  const [doneName, setDoneName] = useState<string | null>(null);
 
   const def = PRESETS.find((p) => p.key === preset)!.def;
-
   const coreCount = def.files.filter((f) => f.core).length;
 
-  const startExport = () => {
-    setStatus("preparing");
-    setTimeout(() => setStatus("packaging"), 700);
-    setTimeout(() => setStatus("done"), 1600);
+  const build = async () => {
+    setStatus("building");
+    setErrorText(null);
+    setDoneName(null);
+    try {
+      const name = await onExport?.(preset);
+      setDoneName(typeof name === "string" ? name : null);
+      setStatus("done");
+    } catch (err) {
+      setErrorText(
+        err instanceof Error ? err.message : "The pack could not be built.",
+      );
+      setStatus("error");
+    }
   };
+
+  // hero copy — mirrors the overview / summary tone
+  let heroTitle: React.ReactNode;
+  let heroText: string;
+  if (!hasData) {
+    heroTitle = (
+      <>
+        Nothing to <em>pack yet.</em>
+      </>
+    );
+    heroText =
+      "Import a bank statement and complete the review — your pack assembles itself from the month's data.";
+  } else if (ready) {
+    heroTitle = (
+      <>
+        Ready to <em>ship.</em>
+      </>
+    );
+    heroText = `All ${transactionCount} transactions reviewed. Pick a preset and build the ZIP — it is assembled in your browser and saved straight to this device.`;
+  } else {
+    heroTitle = (
+      <>
+        Almost <em>there.</em>
+      </>
+    );
+    heroText = `${blockerCount} item${
+      blockerCount === 1 ? "" : "s"
+    } still need a decision before the pack can be built. Review them, then come back — building takes one click.`;
+  }
 
   return (
     <div className={styles.screen}>
-      {/* header */}
+      {/* ------------------------------ header ------------------------------ */}
       <div className={styles.sectionHead}>
         <div className={styles.sectionTitle}>
           <span className={styles.sectionEyebrow}>Export</span>
@@ -112,42 +165,88 @@ export function ExportPackScreen({
               ready ? styles.success : styles.danger
             }`}
           >
-            {ready ? "Ready to export" : "Not ready yet"}
+            {ready ? "Ready to export" : hasData ? "Not ready yet" : "No data yet"}
           </span>
         </div>
       </div>
 
-      {/* readiness gate */}
-      {!ready && (
-        <div className={styles.callout} style={{ margin: "-12px -12px 4px" }}>
-          <span className={`${styles.calloutIcon} ${styles.exIcon} ${styles.red}`}>
-            <IconAlertTriangle size={15} stroke={1.8} />
-          </span>
-          <div>
-            <strong>
-              {blockerCount > 0
-                ? `${blockerCount} blocker${blockerCount !== 1 ? "s" : ""} stopping the export`
-                : "Nothing to export yet"}
-            </strong>
-            <p style={{ margin: "5px 0 0", color: "inherit" }}>
-              {blockerCount > 0
-                ? "Review the missing receipts, duplicates, and uncategorised items before exporting. The app will not upload anything."
-                : "Import a bank statement and complete the review to build your pack. The app will not upload anything."}
-            </p>
+      {/* ------------------------------ hero ------------------------------ */}
+      <section className={styles.hero} aria-labelledby="export-title">
+        <div className={styles.heroCopy}>
+          <div className={styles.heroEyebrow}>
+            <i aria-hidden="true" />
+            Accountant pack
           </div>
-          {blockerCount > 0 && (
-            <button
-              type="button"
-              className={`${styles.btnSecondary} ${styles.sm}`}
-            >
-              Review exceptions
-            </button>
-          )}
+          <h1 id="export-title">{heroTitle}</h1>
+          <p>{heroText}</p>
+          <div className={styles.heroActions}>
+            {!hasData ? null : ready ? (
+              <button
+                type="button"
+                className={`${styles.btnPrimary} ${styles.btnAmber}`}
+                onClick={() => onExport?.(preset)}
+              >
+                <IconDownload size={15} stroke={2} />
+                Build pack
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  onClick={onReview}
+                >
+                  Review blockers
+                  <IconArrowRight size={15} stroke={2} />
+                </button>
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  disabled
+                  title="Resolve the blockers to unlock the export"
+                >
+                  <IconDownload size={15} stroke={1.8} />
+                  Export locked
+                </button>
+              </>
+            )}
+          </div>
         </div>
-      )}
 
-      {/* preset picker */}
-      <div className={styles.section}>
+        <div className={styles.heroEmpty} aria-hidden="true">
+          <span className={styles.heroEmptyRing}>
+            <IconFileZip size={30} stroke={1.5} />
+          </span>
+          <span className={styles.heroEmptyLabel}>
+            {hasData ? `${transactionCount + receiptCount + def.files.length} files` : "No files"}
+          </span>
+        </div>
+      </section>
+
+      {/* ------------------------------ stats strip ------------------------------ */}
+      <section className={styles.sumTotals} aria-label="Pack contents at a glance">
+        <div className={styles.sumTotal}>
+          <span className={styles.sumTotalLabel}>Transactions</span>
+          <strong className={styles.sumTotalValue}>{transactionCount}</strong>
+        </div>
+        <div className={styles.sumTotal}>
+          <span className={styles.sumTotalLabel}>Receipts</span>
+          <strong className={styles.sumTotalValue}>{receiptCount}</strong>
+        </div>
+        <div className={styles.sumTotal}>
+          <span className={styles.sumTotalLabel}>Blockers</span>
+          <strong
+            className={`${styles.sumTotalValue} ${
+              blockerCount > 0 ? styles.sumTotalWarn : styles.sumTotalNet
+            }`}
+          >
+            {blockerCount}
+          </strong>
+        </div>
+      </section>
+
+      {/* ------------------------------ preset picker ------------------------------ */}
+      <section className={styles.section}>
         <div className={styles.sectionHead}>
           <div className={styles.sectionTitle}>
             <span className={styles.sectionEyebrow}>Choose what to include</span>
@@ -155,7 +254,7 @@ export function ExportPackScreen({
           </div>
         </div>
 
-        <div className={styles.choiceGroup}>
+        <div className={styles.choiceGroup} role="radiogroup" aria-label="Export preset">
           {PRESETS.map(({ key, def }) => (
             <label
               key={key}
@@ -176,57 +275,27 @@ export function ExportPackScreen({
             </label>
           ))}
         </div>
+      </section>
 
-        <div
-          className={styles.callout}
-          style={{
-            margin: "12px -12px 0",
-            background: "var(--surface-2)",
-            color: "var(--ink-2)",
-            borderColor: "var(--line)",
-          }}
-        >
-          <span className={styles.calloutIcon}>
-            <IconCloudDownload size={15} stroke={1.8} />
-          </span>
-          <p style={{ margin: 0, color: "inherit" }}>
-            The ZIP is built in your browser and saved to your device. Nothing is
-            uploaded. The exact file names and layout are shown below.
-          </p>
-        </div>
-      </div>
-
-      {/* contents */}
-      <div className={styles.section}>
+      {/* ------------------------------ contents ------------------------------ */}
+      <section className={styles.section}>
         <div className={styles.sectionHead}>
           <div className={styles.sectionTitle}>
             <span className={styles.sectionEyebrow}>What is inside</span>
             <h2 className={styles.sectionH2}>This ZIP will contain</h2>
           </div>
-          <span className={styles.tag}>{coreCount} core file{coreCount !== 1 ? "s" : ""}</span>
+          <span className={styles.tag}>
+            {coreCount} core file{coreCount !== 1 ? "s" : ""}
+          </span>
         </div>
 
         <div className={styles.fileList}>
           {def.files.map((f) => {
-            const isXlsx = f.icon === styles.xlsx;
-            const isPdf = f.icon === styles.pdf;
-            const isFolder = f.icon === styles.folder;
-            const isCsv = f.icon === styles.csv;
-            const isJson = f.icon === styles.json;
-
+            const IconComp = FILE_ICONS[f.icon] ?? IconFiles;
             return (
               <div key={f.label} className={styles.fileItem}>
-                <div
-                  className={isPdf ? styles.pdf : isCsv ? styles.csv : isFolder ? styles.folder : isJson ? styles.json : styles.xlsx}
-                >
-                  {isXlsx && <IconFiles size={17} stroke={1.8} />}
-                  {isPdf && <IconFileTypePdf size={17} stroke={1.8} />}
-                  {isFolder && <IconFileZip size={17} stroke={1.8} />}
-                  {isCsv && <IconFileTypeCsv size={17} stroke={1.8} />}
-                  {isJson && <IconJson size={17} stroke={1.8} />}
-                  {!isXlsx && !isPdf && !isFolder && !isCsv && !isJson && (
-                    <IconFiles size={17} stroke={1.8} />
-                  )}
+                <div className={styles[f.icon] ?? styles.xlsx}>
+                  <IconComp size={17} stroke={1.8} />
                 </div>
 
                 <div className={styles.fileInfo}>
@@ -236,15 +305,13 @@ export function ExportPackScreen({
                     {f.core && (
                       <>
                         <span className={styles.sep}>·</span>
-                        <span className={`${styles.tag} ${styles.strong}`}>
-                          core
-                        </span>
+                        <span className={`${styles.tag} ${styles.strong}`}>core</span>
                       </>
                     )}
                   </div>
                 </div>
 
-                {isFolder && (
+                {f.icon === "folder" && (
                   <span className={styles.fileStatus}>
                     <span className={`${styles.statusPill} ${styles.muted}`}>
                       {receiptCount} files
@@ -252,176 +319,105 @@ export function ExportPackScreen({
                   </span>
                 )}
 
-                {isXlsx && (
-                  <div className={styles.fileActions}>
-                    <span
-                      className={styles.tag}
-                      style={{
-                        background: "var(--surface-2)",
-                        color: "var(--muted)",
-                        borderColor: "var(--line)",
-                      }}
-                    >
-                      {transactionCount} rows
-                    </span>
-                  </div>
+                {f.icon === "xlsx" && (
+                  <span className={styles.fileActions}>
+                    <span className={styles.tag}>{transactionCount} rows</span>
+                  </span>
                 )}
               </div>
             );
           })}
         </div>
 
-        <div
-          className={styles.callout}
-          style={{ margin: "12px -12px 0", background: "var(--sage)", color: "var(--forest)", borderColor: "#c3d6c0" }}
-        >
-          <span className={styles.calloutIcon}>
-            <IconPackage size={15} stroke={1.8} />
+        <p className={styles.sumNote}>
+          Receipt files are renamed by date, vendor, and amount so they match
+          back easily. The ZIP is assembled entirely in your browser — nothing
+          is uploaded.
+        </p>
+      </section>
+
+      {/* ------------------------------ build ------------------------------ */}
+      <section className={styles.section}>
+        <div className={styles.sectionHead}>
+          <div className={styles.sectionTitle}>
+            <span className={styles.sectionEyebrow}>Build and save</span>
+            <h2 className={styles.sectionH2}>
+              {status === "done"
+                ? "Pack built"
+                : status === "building"
+                  ? "Building…"
+                  : ready
+                    ? `${def.name} · ${def.files.length} files`
+                    : "Export locked"}
+            </h2>
+          </div>
+          <span className={`${styles.statusPill} ${ready ? styles.success : styles.muted}`}>
+            {ready ? (
+              <>
+                <IconCheck size={10} stroke={2} />
+                Ready
+              </>
+            ) : (
+              <>
+                <IconAlertTriangle size={10} stroke={2} />
+                {hasData ? `${blockerCount} blocker${blockerCount === 1 ? "" : "s"}` : "Import first"}
+              </>
+            )}
           </span>
-          <div>
-            <strong>Receipts are renamed on export.</strong>
-            <p style={{ margin: "5px 0 0", color: "inherit" }}>
-              Files are renamed by date, vendor, and amount so they are easy to
-              match back later.
-            </p>
-          </div>
         </div>
-      </div>
 
-      {/* build button */}
-      {ready && (
-        <div className={styles.section}>
-          <div className={styles.sectionHead}>
-            <div className={styles.sectionTitle}>
-              <span className={styles.sectionEyebrow}>Build and save</span>
-              <h2 className={styles.sectionH2}>
-                {status === "done" ? "Pack built" : "Ready to export"}
-              </h2>
+        {status === "done" && (
+          <div className={`${styles.callout} ${styles.success}`}>
+            <span className={styles.calloutIcon}>
+              <IconCheck size={15} stroke={2} />
+            </span>
+            <div>
+              <strong>Pack saved to this device.</strong>
+              <p>{doneName ?? "Your pack"} is in your downloads, ready to send.</p>
             </div>
           </div>
+        )}
 
-          {status === "done" && (
-            <div
-              className={styles.callout}
-              style={{ margin: "-12px -12px 4px", background: "var(--sage)", color: "var(--forest)", borderColor: "#c3d6c0" }}
-            >
-              <span className={styles.calloutIcon}>
-                <IconCheck size={15} stroke={2} />
-              </span>
-              <div>
-                <strong>Pack saved to this device.</strong>
-                <p style={{ margin: "5px 0 0", color: "inherit" }}>
-                  Month-End-Pack.zip is ready to send to your accountant or keep
-                  for your records.
-                </p>
-              </div>
-              <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-                <button type="button" className={`${styles.btnSecondary} ${styles.sm}`}>
-                  <IconCloudDownload size={13} stroke={1.8} />
-                  Open folder
-                </button>
-                <button type="button" className={`${styles.btnPrimary} ${styles.sm}`}>
-                  <IconCloudDownload size={13} stroke={1.8} />
-                  Email to accountant
-                </button>
-              </div>
-            </div>
-          )}
-
-          {status !== "done" && (
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className={`${styles.btnPrimary} ${styles.full}`}
-                disabled={status !== "idle"}
-                onClick={startExport}
-              >
-                {status === "idle" && (
-                  <>
-                    <IconCloudDownload size={14} stroke={1.8} />
-                    Export pack
-                  </>
-                )}
-                {status === "preparing" && (
-                  <>
-                    <IconLoader2
-                      size={14}
-                      stroke={1.8}
-                      className={styles.spin}
-                    />
-                    Preparing files…
-                  </>
-                )}
-                {status === "packaging" && (
-                  <>
-                    <IconLoader2
-                      size={14}
-                      stroke={1.8}
-                      className={styles.spin}
-                    />
-                    Packaging ZIP…
-                  </>
-                )}
-              </button>
-
-              {status === "idle" && (
-                <button type="button" className={`${styles.btnGhostSmall} ${styles.sm}`}>
-                  <IconTrash size={13} stroke={1.8} />
-                  Clear last export
-                </button>
-              )}
-            </div>
-          )}
-
-          {status === "preparing" || status === "packaging" ? (
-            <div
-              className={styles.metaRow}
-              style={{ marginTop: 14 }}
-            >
-              <span
-                className={styles.statusPill}
-                style={{ background: "var(--sage)", color: "var(--forest)" }}
-              >
-                <IconLoader2 size={10} stroke={2} className={styles.spin} />
-                {status === "preparing" ? "Reading files" : "Writing ZIP"}
-              </span>
-              <span className={styles.hintInline}>
-                {status === "preparing"
-                  ? `Reading ${receiptCount} receipts and ${transactionCount} transactions…`
-                  : "Packaging 5 files into one archive…"}
-              </span>
-            </div>
-          ) : null}
-        </div>
-      )}
-
-      {/* when not ready, show a disabled build button */}
-      {!ready && status === "idle" && (
-        <div className={styles.section}>
-          <button
-            type="button"
-            className={`${styles.btnPrimary} ${styles.full}`}
-            disabled
-          >
-            <IconCloudDownload size={14} stroke={1.8} />
-            Export pack
-          </button>
-          <div
-            className={styles.callout}
-            style={{ margin: "12px -12px 0", background: "var(--red-soft)", color: "var(--red-ink)", borderColor: "#e3bcb3" }}
-          >
+        {status === "error" && (
+          <div className={`${styles.callout} ${styles.danger}`}>
             <span className={styles.calloutIcon}>
               <IconAlertTriangle size={15} stroke={1.8} />
             </span>
-            <p style={{ margin: 0, color: "inherit" }}>
-              Resolve the blockers above before exporting.
-            </p>
+            <div>
+              <strong>The pack could not be built.</strong>
+              <p>{errorText}</p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        <button
+          type="button"
+          className={`${styles.btnPrimary} ${styles.full}`}
+          disabled={!ready || status === "building"}
+          onClick={build}
+        >
+          {status === "building" ? (
+            <>
+              <IconLoader2 size={14} stroke={2} className={styles.spin} />
+              Building pack…
+            </>
+          ) : (
+            <>
+              <IconDownload size={14} stroke={2} />
+              {status === "done" ? "Build again" : ready ? `Build ${def.name}` : "Export pack"}
+            </>
+          )}
+        </button>
+        <p className={styles.sumNote}>
+          {status === "building"
+            ? "Assembling the archive in your browser — large months can take a moment."
+            : ready
+              ? "One click builds the archive and saves it to your device."
+              : hasData
+                ? "Resolve the remaining blockers — the export unlocks automatically."
+                : "Import a bank statement and review the month to unlock the export."}
+        </p>
+      </section>
     </div>
   );
 }
-
-// minimal spin utility class inline note: a spinner class can be added in
-// home.module.css if desired; for now we use a simple opacity pulse.

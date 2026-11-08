@@ -14,6 +14,7 @@ import { OverviewScreen } from "./overview-screen";
 import { useAiStore, loadAiConfig } from "./ai-store";
 import { useImportStore } from "./import-store";
 import { buildSummary } from "./summary";
+import { buildExportPack, type PackPreset } from "./export-pack";
 import { useUiStore } from "./ui-store";
 import { MonthPicker } from "./month-picker";
 import { AddFilesModal } from "./add-files-modal";
@@ -230,6 +231,27 @@ export default function Home() {
     workspace.currency,
   );
 
+  // Build the accountant pack ZIP in the browser and save it locally.
+  const handleExport = async (
+    preset: PackPreset,
+  ): Promise<string | void> => {
+    if (!workspace) return;
+    const result = await buildExportPack({
+      preset,
+      transactions: importTransactions,
+      summary: monthSummary,
+      job: importJob,
+      workspaceId: workspace.id,
+      monthLabel: formatPeriodLong({
+        month: workspace.month,
+        year: workspace.year,
+      }),
+      monthId: `${workspace.year}-${String(workspace.month + 1).padStart(2, "0")}`,
+      currency: workspace.currency,
+    });
+    return result.fileName;
+  };
+
   return (
     <div className={styles.shell}>
       <Sidebar reviewCount={flaggedCount} />
@@ -435,13 +457,13 @@ export default function Home() {
 
           {view === "export" && (
             <ExportPackScreen
-              ready={false}
-              transactionCount={0}
+              ready={importTransactions.length > 0 && monthSummary.blockers.length === 0}
+              hasData={importTransactions.length > 0}
+              transactionCount={importTransactions.length}
               receiptCount={0}
-              blockerCount={0}
-              onExport={() => {
-                /* will wire to real export later */
-              }}
+              blockerCount={monthSummary.blockers.reduce((n, b) => n + b.count, 0)}
+              onReview={() => setView("review")}
+              onExport={handleExport}
             />
           )}
 
