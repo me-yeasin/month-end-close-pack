@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import styles from "./home.module.css";
 import { useUiStore, type View } from "./ui-store";
+import React from "react";
 
 type NavItem = {
   id: View;
@@ -86,6 +87,7 @@ export function Sidebar() {
   const closeSidebar = useUiStore((state) => state.closeSidebar);
   const view = useUiStore((state) => state.view);
   const setView = useUiStore((state) => state.setView);
+  const workspace = useUiStore((state) => state.workspace);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
 
@@ -209,7 +211,7 @@ export function Sidebar() {
           <span className={styles.wsLabel}>Workspace</span>
           <button type="button" className={styles.wsPicker}>
             <span className={styles.wsDot} />
-            <span>Personal books</span>
+            <span>{workspace?.name ?? "My workspace"}</span>
             <svg
               viewBox="0 0 24 24"
               fill="none"

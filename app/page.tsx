@@ -10,6 +10,7 @@ import { ExceptionsScreen } from "./exceptions-screen";
 import { MonthSummaryScreen } from "./summary-screen";
 import { ExportPackScreen } from "./export-screen";
 import { useUiStore } from "./ui-store";
+import { OnboardingScreen } from "./onboarding";
 
 const VIEW_LABELS: Record<string, string> = {
   overview: "Overview",
@@ -23,8 +24,24 @@ const VIEW_LABELS: Record<string, string> = {
 export default function Home() {
   const view = useUiStore((state) => state.view);
   const setView = useUiStore((state) => state.setView);
+  const workspace = useUiStore((state) => state.workspace);
+  const createWorkspace = useUiStore((state) => state.createWorkspace);
 
   const goBack = () => setView("overview");
+
+  // Show onboarding until the workspace is created
+  if (!workspace) {
+    return (
+      <OnboardingScreen
+        onComplete={(setup) =>
+          createWorkspace({
+            ...setup,
+            createdAt: new Date().toISOString(),
+          })
+        }
+      />
+    );
+  }
 
   return (
     <div className={styles.shell}>
