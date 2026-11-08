@@ -137,19 +137,16 @@ export function ReceiptImportScreen({
         <div className={styles.sectionActions}>
           <button
             type="button"
-            className={`${styles.toggle} ${bankOnly ? "is-on" : ""}`}
+            className={`${styles.toggle} ${bankOnly ? styles.toggleOn : ""}`}
             onClick={() => setBankOnly((v) => !v)}
+            role="switch"
+            aria-checked={bankOnly}
+            aria-label="Bank-only mode"
           >
-            <input
-              type="checkbox"
-              className={styles.toggleTrack}
-              checked={bankOnly}
-              onChange={() => setBankOnly((v) => !v)}
-              aria-label="Bank-only mode"
-            />
-            <span className={styles.toggleTrack} />
-            <span className={styles.toggleKnob} />
-            <span style={{ marginRight: 6 }}>
+            <span className={styles.toggleTrack}>
+              <span className={styles.toggleKnob} />
+            </span>
+            <span style={{ marginRight: 6, display: "inline-flex" }}>
               <IconCloudOff size={13} stroke={1.8} />
             </span>
             <span>Bank-only mode</span>
