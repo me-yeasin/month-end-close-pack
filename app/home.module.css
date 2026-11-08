@@ -2730,6 +2730,11 @@
   color: var(--amber-ink);
 }
 
+.status.info {
+  background: var(--blue-soft);
+  color: var(--blue-ink);
+}
+
 /* money */
 
 .money .cardHead {
@@ -5661,6 +5666,367 @@
 
   .dropZoneDesc {
     font-size: 10.5px;
+  }
+}
+
+/* --------------------------------------------------------------------- */
+/* Screen: Review (exceptions)                                           */
+/* --------------------------------------------------------------------- */
+
+/* thin progress under the toolbar */
+
+.rwProgress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.rwProgressBar {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.rwProgressBar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--forest-3), var(--forest));
+  transition: width 0.35s ease;
+}
+
+.rwProgressLabel {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* toolbar row — holds either filter tabs or the bulk action bar */
+
+.rwToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rwToolbarInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rwToolbarLabel {
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rwBarActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* category select inside the bulk bar */
+
+.rwCategoryWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.rwCategorySelect {
+  appearance: none;
+  padding: 6px 26px 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.rwCategorySelect:hover {
+  border-color: var(--muted);
+  background: #fffefb;
+}
+
+.rwCategorySelect:focus {
+  outline: none;
+  border-color: var(--forest-3);
+  box-shadow: 0 0 0 3px var(--sage);
+}
+
+.rwCategoryChev {
+  position: absolute;
+  right: 8px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* table grid */
+
+.rwTable {
+  margin-top: 4px;
+}
+
+.rwHead,
+.rwRow {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 64px 92px 78px 176px;
+  align-items: center;
+  gap: 12px;
+}
+
+.rwHead {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.rwRow {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 10px;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+
+.rwRow:last-child {
+  border-bottom: 0;
+}
+
+.rwRow:hover {
+  background: var(--surface-2);
+}
+
+.rwRowFocus {
+  background: var(--surface-2);
+  box-shadow: inset 2.5px 0 0 var(--forest-3);
+}
+
+.rwRowSelected {
+  background: var(--sage);
+}
+
+.rwRowSelected:hover,
+.rwRowSelected.rwRowFocus {
+  background: var(--sage);
+}
+
+.rwCellCheck {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* severity icon tints */
+
+.rwIconRed {
+  background: var(--red-soft);
+  color: var(--red-ink);
+}
+
+.rwIconAmber {
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+
+.rwIconBlue {
+  background: var(--blue-soft);
+  color: var(--blue-ink);
+}
+
+/* issue cell */
+
+.rwIssue {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.rwIssueText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.rwIssueType {
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rwIssueTitle {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rwIssueReason {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rwIssueText .chip {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+/* data cells */
+
+.rwDate {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rwAmount {
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rwAmountIn {
+  color: #2c7251;
+}
+
+.rwSeverity {
+  font-size: 11px;
+}
+
+/* row actions — revealed on hover or keyboard focus */
+
+.rwActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.rwRowActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+/* compact buttons so Accept + Personal fit the fixed actions column */
+.rwRowActions .btnGhostSmall,
+.rwRowActions .btnDanger {
+  height: 28px;
+  padding: 0 9px;
+  gap: 5px;
+  font-size: 11px;
+}
+
+.rwRow:hover .rwRowActions,
+.rwRow:focus-within .rwRowActions,
+.rwRowFocus .rwRowActions {
+  opacity: 1;
+}
+
+/* keyboard hints in the footer */
+
+.rwKbdHints {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+/* a11y */
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* indeterminate state for the select-all checkbox */
+
+.check input:indeterminate + .checkBox {
+  background: var(--forest);
+  border-color: var(--forest);
+}
+
+.check input:indeterminate + .checkBox::after {
+  width: 8px;
+  height: 2px;
+  border: 0;
+  border-radius: 1px;
+  background: #f4eddb;
+  transform: none;
+  translate: 0 0;
+  opacity: 1;
+}
+
+@media (max-width: 860px) {
+  .rwHead,
+  .rwRow {
+    grid-template-columns: 26px minmax(0, 1fr) 92px 78px 176px;
+  }
+
+  .rwHead .rwDate,
+  .rwRow .rwDate {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .rwHead,
+  .rwRow {
+    grid-template-columns: 26px minmax(0, 1fr) 92px;
+  }
+
+  .rwHead .rwSeverity,
+  .rwRow .rwSeverity,
+  .rwHead .rwActions,
+  .rwRow .rwActions {
+    display: none;
+  }
+
+  .rwRowActions {
+    opacity: 1;
   }
 }
 

@@ -526,7 +526,7 @@ function TransactionDetail({
           {/* Receipt match info */}
           {transaction.matchStatus !== "matched" && (
             <div className={styles.detailSection}>
-              <div className={styles.detailSectionTitle}>What's missing</div>
+              <div className={styles.detailSectionTitle}>What&rsquo;s missing</div>
               <div className={styles.callout} style={{ marginTop: 0 }}>
                 <span
                   className={`${styles.calloutIcon} ${styles.exIcon} ${

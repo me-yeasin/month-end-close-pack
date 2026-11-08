@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   IconCheck,
-  IconX,
   IconClipboard,
   IconUserOff,
   IconReceipt,
@@ -11,8 +10,10 @@ import {
   IconAlertTriangle,
   IconCash,
   IconCurrency,
+  IconChevronDown,
 } from "@tabler/icons-react";
 import styles from "./home.module.css";
+import { DEFAULT_CATEGORIES } from "../types";
 
 type ExType =
   | "missing_receipt"
@@ -31,9 +32,9 @@ interface Exception {
   severity: "high" | "medium" | "low";
   message: string;
   sub?: string;
+  date?: string;
   category?: string;
   value?: number;
-  valueLabel?: string;
   checked?: boolean;
 }
 
@@ -45,22 +46,22 @@ const FILTER_TABS: { key: string; label: string }[] = [
   { key: "uncategorised", label: "Needs a look" },
 ];
 
-const GROUP: Record<ExType, { label: string; icon: string }> = {
-  missing_receipt: { label: "Missing receipt", icon: "receipt" },
-  unmatched_receipt: { label: "Unmatched receipt", icon: "receipt" },
-  duplicate_transaction: { label: "Duplicate transaction", icon: "duplicate" },
-  duplicate_receipt: { label: "Duplicate receipt", icon: "duplicate" },
-  amount_mismatch: { label: "Amount mismatch", icon: "amount" },
-  foreign_currency: { label: "Foreign currency", icon: "currency" },
-  possible_personal: { label: "Possible personal", icon: "personal" },
-  uncategorised: { label: "Uncategorised", icon: "uncategorised" },
-  low_confidence: { label: "Low confidence", icon: "review" },
+const GROUP: Record<ExType, string> = {
+  missing_receipt: "Missing receipt",
+  unmatched_receipt: "Unmatched receipt",
+  duplicate_transaction: "Duplicate transaction",
+  duplicate_receipt: "Duplicate receipt",
+  amount_mismatch: "Amount mismatch",
+  foreign_currency: "Foreign currency",
+  possible_personal: "Possible personal",
+  uncategorised: "Uncategorised",
+  low_confidence: "Low confidence",
 };
 
-const SEV: Record<string, string> = {
-  high: styles.red,
-  medium: styles.amber,
-  low: styles.blue,
+const SEVERITY: Record<string, { label: string; pillCls: string; iconCls: string }> = {
+  high: { label: "High", pillCls: styles.missing, iconCls: styles.rwIconRed },
+  medium: { label: "Medium", pillCls: styles.review, iconCls: styles.rwIconAmber },
+  low: { label: "Low", pillCls: styles.info, iconCls: styles.rwIconBlue },
 };
 
 export function ExceptionsScreen({
@@ -69,372 +70,406 @@ export function ExceptionsScreen({
   onSetCategory,
   onMarkPersonal,
   onMarkReviewed,
+  currency = "GBP",
 }: {
   exceptions: Exception[];
   onAcceptSuggested?: (ids: string[]) => void;
   onSetCategory?: (ids: string[], category: string) => void;
   onMarkPersonal?: (ids: string[]) => void;
   onMarkReviewed?: (ids: string[]) => void;
+  currency?: "GBP" | "EUR";
 }) {
+  const symbol = currency === "EUR" ? "€" : "£";
+
   const [filter, setFilter] = useState("all");
   const [bulk, setBulk] = useState<string[]>([]);
-  const [nextId, setNextId] = useState<string | null>(null);
+  const [resolved, setResolved] = useState<Set<string>>(new Set());
+  const [categories, setCategories] = useState<Record<string, string>>({});
+  const [focusIdxRaw, setFocusIdx] = useState(0);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const filtered = useMemo(
-    () =>
-      filter === "all"
-        ? exceptions
-        : exceptions.filter((e) => e.type === filter),
-    [exceptions, filter],
+  const open = useMemo(
+    () => exceptions.filter((e) => !resolved.has(e.id)),
+    [exceptions, resolved],
   );
 
-  const selected = bulk.length;
+  const filtered = useMemo(() => {
+    const base = filter === "all" ? exceptions : exceptions.filter((e) => e.type === filter);
+    return base.filter((e) => !resolved.has(e.id));
+  }, [exceptions, filter, resolved]);
 
-  const next = () => {
-    const remaining = filtered.filter((e) => !e.checked);
-    if (remaining.length === 0) return;
-    setNextId(remaining[0].id);
+  // keep keyboard focus inside bounds when the list changes — derived, not stored
+  const focusIdx = Math.min(focusIdxRaw, Math.max(0, filtered.length - 1));
+
+  const selected = bulk.filter((id) => filtered.some((e) => e.id === id));
+  const selecting = selected.length > 0;
+
+  const toggle = (id: string) => {
+    setBulk((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
   };
 
-  const current = nextId ? filtered.find((e) => e.id === nextId) : null;
+  const toggleAll = () => {
+    const allSelected = filtered.length > 0 && filtered.every((e) => bulk.includes(e.id));
+    setBulk(allSelected ? [] : filtered.map((e) => e.id));
+  };
+
+  const resolve = (ids: string[]) => {
+    setResolved((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+    setBulk((prev) => prev.filter((id) => !ids.includes(id)));
+  };
+
+  const accept = (ids: string[]) => {
+    onAcceptSuggested?.(ids);
+    resolve(ids);
+  };
+
+  const markPersonal = (ids: string[]) => {
+    onMarkPersonal?.(ids);
+    resolve(ids);
+  };
+
+  const markReviewed = (ids: string[]) => {
+    onMarkReviewed?.(ids);
+    resolve(ids);
+  };
+
+  const setCategory = (ids: string[], categoryId: string) => {
+    onSetCategory?.(ids, categoryId);
+    const name =
+      DEFAULT_CATEGORIES.find((c) => c.id === categoryId)?.name ?? categoryId;
+    setCategories((prev) => {
+      const next = { ...prev };
+      ids.forEach((id) => (next[id] = name));
+      return next;
+    });
+    resolve(ids);
+  };
+
+  const acceptSuggestions = () => {
+    const ids = filtered.filter((e) => e.severity !== "high").map((e) => e.id);
+    if (ids.length > 0) accept(ids);
+  };
+
+  // keyboard-first review: J/K move, Space select, A accept
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+      if (filtered.length === 0) return;
+      const focused = filtered[Math.min(focusIdx, filtered.length - 1)];
+      if (!focused) return;
+      if (e.key === "j") {
+        e.preventDefault();
+        setFocusIdx((i) => Math.min(filtered.length - 1, i + 1));
+      } else if (e.key === "k") {
+        e.preventDefault();
+        setFocusIdx((i) => Math.max(0, i - 1));
+      } else if (e.key === " ") {
+        e.preventDefault();
+        toggle(focused.id);
+      } else if (e.key === "a") {
+        e.preventDefault();
+        accept([focused.id]);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }); // re-registered on every render — closures stay fresh
+
+  // select-all checkbox: reflect page scope, support indeterminate
+  const allSelected = filtered.length > 0 && filtered.every((e) => bulk.includes(e.id));
+  const someSelected = filtered.some((e) => bulk.includes(e.id)) && !allSelected;
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someSelected;
+  }, [someSelected]);
+
+  const remaining = open.length;
+  const total = exceptions.length;
+  const progress = total > 0 ? Math.round(((total - remaining) / total) * 100) : 0;
+  const suggestionCount = filtered.filter((e) => e.severity !== "high").length;
+
+  const formatAmount = (v: number) =>
+    `${v >= 0 ? "+" : "−"}${symbol}${Math.abs(v).toFixed(2)}`;
 
   return (
     <div className={styles.screen}>
-      {/* header */}
+      {/* ------------------------------ header ------------------------------ */}
       <div className={styles.sectionHead}>
         <div className={styles.sectionTitle}>
           <span className={styles.sectionEyebrow}>Review</span>
           <h2 className={styles.sectionH2}>Exceptions</h2>
         </div>
         <div className={styles.sectionActions}>
-          <span className={styles.tag}>{filtered.length} item{filtered.length !== 1 ? "s" : ""}</span>
-          {selected > 0 && (
-            <span className={styles.badge}>{selected}</span>
-          )}
-        </div>
-      </div>
-
-      {/* tabs */}
-      <div className={styles.section}>
-        <div className={styles.sectionHead}>
-          <div className={styles.sectionTitle}>
-            <span className={styles.sectionEyebrow}>Filter</span>
-            <h2 className={styles.sectionH2}>What needs attention</h2>
-          </div>
-        </div>
-
-        <div className={styles.filters}>
-          <div className={styles.filterTabs}>
-            {FILTER_TABS.map((t) => {
-              const count =
-                t.key === "all"
-                  ? exceptions.length
-                  : exceptions.filter((e) => e.type === t.key).length;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  className={`${styles.filterTab} ${
-                    filter === t.key ? styles.active : ""
-                  }`}
-                  onClick={() => setFilter(t.key)}
-                >
-                  {t.label}
-                  {count > 0 && <span className={styles.badge}>{count}</span>}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className={styles.filterSpacer} />
-
-          {selected > 0 && (
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <span className={styles.hintInline}>
-                {selected} selected
-              </span>
-              <button
-                type="button"
-                className={`${styles.btnGhostSmall} ${styles.sm}`}
-                onClick={() => setBulk([])}
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                className={`${styles.btnSecondary} ${styles.sm}`}
-                onClick={() => onMarkReviewed?.(bulk)}
-              >
-                <IconCheck size={13} stroke={1.8} />
-                Mark reviewed
-              </button>
-              <button
-                type="button"
-                className={`${styles.btnDanger} ${styles.sm}`}
-                onClick={() => onMarkPersonal?.(bulk)}
-              >
-                <IconUserOff size={13} stroke={1.8} />
-                Mark personal
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* count summary */}
-        <div
-          className={styles.metaRow}
-          style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line)" }}
-        >
-          <div className={styles.metaItem}>
-            <strong>
-              {exceptions.filter((e) => e.type === "possible_personal").length}
-            </strong>{" "}
-            personal
-          </div>
-          <div className={styles.metaItem}>
-            <strong>
-              {
-                exceptions.filter((e) => e.type === "duplicate_transaction")
-                  .length
-              }
-            </strong>{" "}
-            duplicates
-          </div>
-          <div className={styles.metaItem}>
-            <strong>
-              {exceptions.filter((e) => e.type === "foreign_currency").length}
-            </strong>{" "}
-            foreign currency
-          </div>
-          <div className={styles.metaItem}>
-            <strong>
-              {exceptions.filter((e) => e.type === "uncategorised").length}
-            </strong>{" "}
-            need a look
-          </div>
-        </div>
-      </div>
-
-      {/* item list */}
-      <div className={styles.section}>
-        <div
-          className={styles.sectionHead}
-          style={{ marginBottom: 4 }}
-        >
-          <div className={styles.sectionTitle}>
-            <span className={styles.sectionEyebrow}>
-              {filter === "all" ? "All exceptions" : GROUP[
-                filter as ExType
-              ]?.label ?? "Exceptions"}
+          {total > 0 && (
+            <span className={styles.tag}>
+              {remaining} of {total} to review
             </span>
+          )}
+        </div>
+      </div>
+
+      <section className={styles.section}>
+        {/* progress */}
+        {total > 0 && (
+          <div className={styles.rwProgress}>
+            <div className={styles.rwProgressBar}>
+              <span style={{ width: `${progress}%` }} />
+            </div>
+            <span className={styles.rwProgressLabel}>{progress}% reviewed</span>
           </div>
+        )}
+
+        {/* toolbar — swaps between filters and bulk actions */}
+        <div className={styles.rwToolbar}>
+          {selecting ? (
+            <>
+              <div className={styles.rwToolbarInfo}>
+                <span className={styles.badge}>{selected.length}</span>
+                <span className={styles.rwToolbarLabel}>
+                  {selected.length === 1 ? "item selected" : "items selected"}
+                </span>
+                <button
+                  type="button"
+                  className={`${styles.btnGhostSmall} ${styles.sm}`}
+                  onClick={() => setBulk([])}
+                >
+                  Clear
+                </button>
+              </div>
+              <div className={styles.rwBarActions}>
+                <div className={styles.rwCategoryWrap}>
+                  <select
+                    className={styles.rwCategorySelect}
+                    defaultValue=""
+                    aria-label="Set category for selected items"
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setCategory(selected, e.target.value);
+                        e.target.value = "";
+                      }
+                    }}
+                  >
+                    <option value="" disabled>
+                      Set category…
+                    </option>
+                    {DEFAULT_CATEGORIES.filter((c) => c.id !== "uncategorised").map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <IconChevronDown size={13} stroke={1.8} className={styles.rwCategoryChev} />
+                </div>
+                <button
+                  type="button"
+                  className={`${styles.btnSecondary} ${styles.sm}`}
+                  onClick={() => markReviewed(selected)}
+                >
+                  <IconCheck size={13} stroke={1.8} />
+                  Mark reviewed
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.btnDanger} ${styles.sm}`}
+                  onClick={() => markPersonal(selected)}
+                >
+                  <IconUserOff size={13} stroke={1.8} />
+                  Mark personal
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={styles.filterTabs} role="tablist">
+                {FILTER_TABS.map((t) => {
+                  const count =
+                    t.key === "all"
+                      ? total
+                      : exceptions.filter((e) => e.type === t.key && !resolved.has(e.id)).length;
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={filter === t.key}
+                      className={`${styles.filterTab} ${
+                        filter === t.key ? styles.active : ""
+                      }`}
+                      onClick={() => setFilter(t.key)}
+                    >
+                      {t.label}
+                      {count > 0 && <span className={styles.badge}>{count}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className={styles.rwBarActions}>
+                {suggestionCount > 0 && (
+                  <button
+                    type="button"
+                    className={`${styles.btnGhostSmall} ${styles.sm}`}
+                    onClick={acceptSuggestions}
+                  >
+                    <IconCheck size={13} stroke={1.8} />
+                    Accept {suggestionCount} suggestion{suggestionCount === 1 ? "" : "s"}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
-        {filtered.length === 0 && (
+        {/* list */}
+        {filtered.length === 0 ? (
           <div className={styles.empty}>
             <div className={styles.emptyIcon}>
               <IconCheck size={22} stroke={1.8} />
             </div>
-            <div className={styles.emptyTitle}>Nothing here</div>
-            <div className={styles.emptyDesc}>
-              No exceptions match this filter. Your month is looking clean.
+            <div className={styles.emptyTitle}>
+              {total > 0 && remaining === 0 ? "All reviewed" : "Nothing here"}
             </div>
+            <div className={styles.emptyDesc}>
+              {total > 0 && remaining === 0
+                ? "Every exception has been handled. Your month is looking clean."
+                : "No exceptions match this filter."}
+            </div>
+          </div>
+        ) : (
+          <div className={styles.rwTable} role="table" aria-label="Exceptions to review">
+            {/* head */}
+            <div className={styles.rwHead} role="row">
+              <div className={styles.rwCellCheck} role="columnheader">
+                <label className={styles.check}>
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    aria-label={`Select all ${filtered.length} items in this view`}
+                  />
+                  <span className={styles.checkBox} />
+                </label>
+              </div>
+              <div role="columnheader">Issue</div>
+              <div className={styles.rwDate} role="columnheader">
+                Date
+              </div>
+              <div className={styles.rwAmount} role="columnheader">
+                Amount
+              </div>
+              <div className={styles.rwSeverity} role="columnheader">
+                Severity
+              </div>
+              <div className={styles.rwActions} role="columnheader">
+                <span className={styles.visuallyHidden}>Actions</span>
+              </div>
+            </div>
+
+            {/* rows */}
+            {filtered.map((ex, idx) => {
+              const sev = SEVERITY[ex.severity] ?? SEVERITY.low;
+              const isFocused = idx === focusIdx;
+              const category = categories[ex.id] ?? ex.category;
+              return (
+                <div
+                  key={ex.id}
+                  role="row"
+                  className={`${styles.rwRow} ${isFocused ? styles.rwRowFocus : ""} ${
+                    bulk.includes(ex.id) ? styles.rwRowSelected : ""
+                  }`}
+                >
+                  <div className={styles.rwCellCheck} role="cell">
+                    <label className={styles.check}>
+                      <input
+                        type="checkbox"
+                        checked={bulk.includes(ex.id)}
+                        onChange={() => toggle(ex.id)}
+                        aria-label={`Select ${GROUP[ex.type]}: ${ex.message}`}
+                      />
+                      <span className={styles.checkBox} />
+                    </label>
+                  </div>
+
+                  <div className={styles.rwIssue} role="cell">
+                    <span className={`${styles.exIcon} ${sev.iconCls}`}>
+                      <ExceptionIcon type={ex.type} />
+                    </span>
+                    <span className={styles.rwIssueText}>
+                      <span className={styles.rwIssueType}>{GROUP[ex.type] ?? ex.type}</span>
+                      <span className={styles.rwIssueTitle}>{ex.message}</span>
+                      {ex.sub && <span className={styles.rwIssueReason}>{ex.sub}</span>}
+                      {category && <span className={styles.chip}>{category}</span>}
+                    </span>
+                  </div>
+
+                  <div className={styles.rwDate} role="cell">
+                    {ex.date ?? "—"}
+                  </div>
+
+                  <div
+                    className={`${styles.rwAmount} ${ex.value !== undefined && ex.value >= 0 ? styles.rwAmountIn : ""}`}
+                    role="cell"
+                  >
+                    {ex.value !== undefined ? formatAmount(ex.value) : "—"}
+                  </div>
+
+                  <div className={styles.rwSeverity} role="cell">
+                    <span className={`${styles.status} ${sev.pillCls}`}>{sev.label}</span>
+                  </div>
+
+                  <div className={styles.rwActions} role="cell">
+                    <div className={styles.rwRowActions}>
+                      <button
+                        type="button"
+                        className={styles.btnGhostSmall}
+                        onClick={() => accept([ex.id])}
+                      >
+                        <IconCheck size={13} stroke={1.8} />
+                        Accept
+                      </button>
+                      {ex.type === "possible_personal" && (
+                        <button
+                          type="button"
+                          className={styles.btnDanger}
+                          onClick={() => markPersonal([ex.id])}
+                        >
+                          <IconUserOff size={13} stroke={1.8} />
+                          Personal
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {filtered.map((ex) => (
-          <div
-            key={ex.id}
-            className={styles.exception}
-            style={{
-              borderLeft:
-                "3px solid " +
-                (SEV[ex.severity] === styles.red
-                  ? "var(--red-ink)"
-                  : SEV[ex.severity] === styles.amber
-                  ? "var(--amber-ink)"
-                  : "var(--blue-ink)"),
-            }}            >          <span className={`${styles.exIcon} ${SEV[ex.severity] === styles.red ? styles.exIconRed : SEV[ex.severity] === styles.amber ? styles.exIconAmber : styles.exIconBlue}`}
-              style={{ width: 34, height: 34 }}
-            >
-              <ExceptionIcon type={ex.type} />
-            </span>
-
-            <div className={styles.exBody}>
-              <strong>
-                {GROUP[ex.type]?.label ?? ex.type}
-              </strong>
-              <span>
-                {ex.message}
-                {ex.sub && <> &middot; {ex.sub}</>}
-              </span>
-            </div>
-
-            {ex.category && (
-              <span className={styles.chip}>{ex.category}</span>
-            )}
-            {ex.value !== undefined && ex.valueLabel && (
-              <span
-                className={styles.tag}
-                style={{
-                  borderColor: "var(--amber)",
-                  color: "var(--amber-ink)",
-                  background: "var(--amber-soft)",
-                }}
-              >
-                {ex.valueLabel}
-              </span>
-            )}
-
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-              <span className={styles.check}>
-                <input
-                  type="checkbox"
-                  className={styles.checkBox}
-                  checked={ex.checked ?? bulk.includes(ex.id)}
-                  onChange={() => {
-                    setBulk((prev) =>
-                      prev.includes(ex.id)
-                        ? prev.filter((id) => id !== ex.id)
-                        : [...prev, ex.id],
-                    );
-                  }}
-                />
-              </span>
-              <button
-                type="button"
-                className={`${styles.btnGhostSmall} ${styles.sm}`}
-                onClick={() => {
-                  onAcceptSuggested?.([ex.id]);
-                }}
-              >
-                Accept
-              </button>
-              <button
-                type="button"
-                className={`${styles.btnSecondary} ${styles.sm}`}
-                onClick={() => {
-                  onSetCategory?.([ex.id], "software");
-                }}
-              >
-                Set category
-              </button>
-              {ex.type === "possible_personal" && (
-                <button
-                  type="button"
-                  className={`${styles.btnDanger} ${styles.sm}`}
-                  onClick={() => onMarkPersonal?.([ex.id])}
-                >
-                  <IconUserOff size={13} stroke={1.8} />
-                  Personal
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* bulk actions bar when nothing selected */}
-      {selected === 0 && (
-        <div
-          className={styles.callout}
-          style={{ margin: "-12px -12px 0", background: "var(--sage)", borderColor: "#c3d6c0", color: "var(--forest)" }}              >
-            <span
-              className={`${styles.calloutIcon} ${styles.exIcon} ${styles.exIconForest}`}
-              data-ex>
-            <IconClipboard size={15} stroke={1.8} />
+        {/* footer */}
+        <div className={styles.tableFooter}>
+          <span className={styles.tableCount}>
+            {filtered.length} item{filtered.length !== 1 ? "s" : ""} in view
           </span>
-          <div>
-            <strong>
-              You can accept all high-confidence suggestions in one go.
-            </strong>
-            <p style={{ margin: "5px 0 0", color: "inherit" }}>
-              Use the checkboxes to pick items, or Accept on each one as you go.
-            </p>
-          </div>
-          <button
-            type="button"
-            className={`${styles.btnSecondary} ${styles.sm}`}
-            style={{ marginLeft: "auto" }}
-            onClick={() => onAcceptSuggested?.(filtered.filter((e) => e.severity !== "high").map((e) => e.id))}
-          >
-            Accept all high-confidence
-          </button>
-        </div>
-      )}
-
-      {/* keyboard-next hint */}
-      <div
-        className={styles.metaRow}
-        style={{ marginTop: 6, color: "var(--muted)", fontSize: 11 }}
-      >
-        <span className={styles.kbd}>J</span>
-        <span>next item</span>
-        <span style={{ marginLeft: 14 }} className={styles.kbd}>K</span>
-        <span>previous</span>
-        <span style={{ marginLeft: 14 }} className={styles.kbd}>Space</span>
-        <span>toggle</span>
-        <span style={{ marginLeft: 14 }} className={styles.kbd}>A</span>
-        <span>accept</span>
-      </div>
-
-      {/* focused item overlay */}
-      {current && (
-        <div
-          className={styles.callout}
-          style={{
-            margin: "-12px -12px 0",
-            background: "var(--surface)",
-            border: "1px solid var(--line-strong)",
-            borderLeft: "3px solid var(--forest)",
-          }}
-        >
-          <span className={`${styles.calloutIcon} ${styles.exIcon} ${styles.exIconForest}`} data-ex>
-            <IconAlertTriangle size={15} stroke={1.8} />
-          </span>
-          <div>
-            <strong>Focused item</strong>
-            <p style={{ margin: "5px 0 0", color: "inherit" }}>
-              {GroupLabel(current.type)}: {current.message}
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: 6, marginLeft: "auto", alignItems: "center" }}>
+          <div className={styles.rwKbdHints}>
             <span className={styles.kbd}>J</span>
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>skip</span>
+            <span>next</span>
+            <span className={styles.kbd}>K</span>
+            <span>prev</span>
+            <span className={styles.kbd}>Space</span>
+            <span>select</span>
+            <span className={styles.kbd}>A</span>
+            <span>accept</span>
           </div>
         </div>
-      )}
-
-      {/* footer */}
-      <div className={styles.tableFooter} style={{ paddingTop: 12 }}>
-        <span className={styles.tableCount}>
-          {filtered.length} exception{filtered.length !== 1 ? "s" : ""} ·
-          {filtered.filter((e) => !e.checked).length} remaining
-        </span>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            className={`${styles.btnSecondary} ${styles.sm}`}
-            onClick={() => onAcceptSuggested?.(filtered.map((e) => e.id))}
-          >
-            Accept all
-          </button>
-          <button
-            type="button"
-            className={`${styles.btnPrimary} ${styles.sm}`}
-            onClick={() => onMarkReviewed?.([])}
-          >
-            <IconCheck size={13} stroke={1.8} />
-            Mark all reviewed
-          </button>
-        </div>
-      </div>
+      </section>
     </div>
   );
-}
-
-function GroupLabel(type: ExType) {
-  return GROUP[type]?.label ?? type;
 }
 
 function ExceptionIcon({ type }: { type: ExType }) {
@@ -458,7 +493,3 @@ function ExceptionIcon({ type }: { type: ExType }) {
   }
   return <IconAlertTriangle size={15} stroke={1.8} />;
 }
-
-// inline alert icon shim so the focused-item overlay can render without
-// depending on IconAlert when it is not otherwise imported.
-

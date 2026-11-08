@@ -209,9 +209,9 @@ export default function Home() {
       severity: t.flag!.severity,
       message: t.description,
       sub: t.flag!.reason,
+      date: formatTxDate(t.date),
       category: undefined,
       value: t.amount,
-      valueLabel: undefined,
       checked: false,
     }));
 
@@ -407,6 +407,7 @@ export default function Home() {
               onSetCategory={() => {}}
               onMarkPersonal={() => {}}
               onMarkReviewed={() => {}}
+              currency={workspace.currency}
             />
           )}
 
