@@ -68,6 +68,7 @@ export function TransactionsScreen({
   onImport,
   aiConfigured = false,
   isProcessing = false,
+  searchQuery,
 }: {
   transactions: Tx[];
   onEdit?: (id: string) => void;
@@ -78,10 +79,12 @@ export function TransactionsScreen({
   aiConfigured?: boolean;
   /** When true, an import is already running — disable the button. */
   isProcessing?: boolean;
+  /** Initial search text (from the header global search). */
+  searchQuery?: string;
 }) {
   const symbol = currency === "EUR" ? "€" : "£";
   const [filters, setFilters] = useState({
-    search: "",
+    search: searchQuery ?? "",
     status: "all",
     category: "all",
     direction: "all",

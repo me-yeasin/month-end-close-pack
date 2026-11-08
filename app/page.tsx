@@ -20,6 +20,8 @@ import { autoMatch } from "./matching";
 import { useUiStore } from "./ui-store";
 import { MonthPicker } from "./month-picker";
 import { AddFilesModal } from "./add-files-modal";
+import { GlobalSearch } from "./global-search";
+import type { View } from "./ui-store";
 import { formatPeriodLong, formatPeriodShort, currentPeriod } from "./period";
 import { OnboardingScreen } from "./onboarding";
 import {
@@ -66,6 +68,9 @@ export default function Home() {
   const [addFilesMode, setAddFilesMode] = useState<
     "all" | "bank" | "receipts"
   >("all");
+
+  // pre-filled ledger search (set from the header global search)
+  const [ledgerSearch, setLedgerSearch] = useState<string | null>(null);
   const openAddFiles = (mode: "all" | "bank" | "receipts") => {
     setAddFilesMode(mode);
     setAddFilesOpen(true);
@@ -381,24 +386,28 @@ export default function Home() {
                 <span className={styles.pulse} />
                 On this device
               </span>
-              <button
-                type="button"
-                className={styles.iconBtn}
-                aria-label="Search"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m20 20-3.2-3.2" />
-                </svg>
-              </button>
+              <GlobalSearch
+                transactions={txRows.map((t) => ({
+                  id: t.id,
+                  date: t.date,
+                  description: t.description,
+                  account: t.account,
+                  category: t.category,
+                  amount: t.amount,
+                  direction: t.direction,
+                  flagged: t.flagged,
+                }))}
+                receipts={receiptRecords.map((r) => ({
+                  id: r.id,
+                  name: r.originalName,
+                  vendor: r.extracted?.vendor.value || "",
+                }))}
+                currency={workspace.currency}
+                onSelect={(target) => {
+                  setLedgerSearch("query" in target ? target.query : null);
+                  setView(target.view as View);
+                }}
+              />
               <div className={styles.monthWrap} ref={monthRef}>
                 <button
                   type="button"
@@ -515,6 +524,7 @@ export default function Home() {
           {view === "transactions" && (
             <TransactionsScreen
               transactions={txRows}
+              searchQuery={ledgerSearch ?? undefined}
               onEdit={() => setView("review")}
               currency={workspace.currency}
               onImport={() => openAddFiles("bank")}
