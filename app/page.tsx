@@ -120,8 +120,6 @@ export default function Home() {
   // true while we are reading IndexedDB on first mount
   const [loading, setLoading] = useState(true);
 
-  const goBack = () => setView("overview");
-
   // On mount: read IndexedDB and hydrate the Zustand store.
   // useEffect never runs on the server — IndexedDB is browser-only.
   useEffect(() => {
@@ -326,56 +324,6 @@ export default function Home() {
               </div>
             </div>
           </header>
-
-          {/* sub-view index bar for non-overview views */}
-          {view !== "overview" &&
-            view !== "settings" &&
-            view !== "transactions" && (
-            <div
-              className={styles.topbar}
-              style={{ marginBottom: 18, height: "auto", paddingBottom: 14, borderBottom: "1px solid var(--line)" }}
-            >
-              <div className={styles.crumbs}>
-                <strong>{formatPeriodLong({ month: workspace.month, year: workspace.year })}</strong>
-                <svg
-                  className={styles.crumbChevron}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="m9 18 6-6-6-6" />
-                </svg>
-                <span style={{ textTransform: "uppercase", color: "var(--muted)", fontSize: 10, fontWeight: 700, letterSpacing: "0.14em" }}>
-                  {view === "receipts" && "Receipts"}
-                  {view === "review" && "Review"}
-                  {view === "summary" && "Summary"}
-                  {view === "export" && "Export"}
-                </span>
-              </div>
-              <button
-                type="button"
-                className={styles.iconBtn}
-                onClick={goBack}
-                aria-label="Back to overview"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="m15 18-6-6 6-6" />
-                </svg>
-              </button>
-            </div>
-          )}
 
           {/* ================= VIEW CONTENT ================= */}
           {view === "overview" && (
