@@ -583,6 +583,11 @@
     gap: 22px;
     align-items: start;
   }
+
+  /* Single-section mode (bank-only / receipts-only) stays one column. */
+  .afBodySingle {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Mobile: app-drawer style square tiles for selected files */

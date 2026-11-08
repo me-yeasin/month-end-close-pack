@@ -200,11 +200,14 @@ export function AddFilesModal({
   open,
   onClose,
   onAdd,
+  mode = "all",
 }: {
   open: boolean;
   onClose: () => void;
   /** Hand the chosen bank statement files to the app for processing. */
   onAdd?: (bankFiles: File[]) => void;
+  /** Which sections to show: both (overview), bank only (transactions), or receipts only. */
+  mode?: "all" | "bank" | "receipts";
 }) {
   const [bankFiles, setBankFiles] = useState<File[]>([]);
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
@@ -256,7 +259,23 @@ export function AddFilesModal({
     index: number,
   ) => setter((prev) => prev.filter((_, i) => i !== index));
 
-  const totalCount = bankFiles.length + receiptFiles.length;
+  const showBank = mode !== "receipts";
+  const showReceipts = mode !== "bank";
+  const singleSection = mode !== "all";
+
+  const relevantCount =
+    mode === "bank"
+      ? bankFiles.length
+      : mode === "receipts"
+        ? receiptFiles.length
+        : bankFiles.length + receiptFiles.length;
+
+  const introText =
+    mode === "bank"
+      ? "Upload your bank statements for this month. We'll read them on this device and prepare the pack for your review."
+      : mode === "receipts"
+        ? "Upload your receipts for this month. We'll read them on this device and prepare the pack for your review."
+        : "Upload your bank statements and receipts for this month. We'll read them on this device and prepare the pack for your review.";
 
   const isCsv = (file: File) =>
     file.name.toLowerCase().endsWith(".csv") ||
@@ -295,52 +314,55 @@ export function AddFilesModal({
           </button>
         </div>
 
-        <p className={styles.afIntro}>
-          Upload your bank statements and receipts for this month. We&rsquo;ll
-          read them on this device and prepare the pack for your review.
-        </p>
+        <p className={styles.afIntro}>{introText}</p>
 
-        <div className={`${styles.afBody} ${styles.thinScroll}`}>
-          <UploadSection
-            title="Bank statements"
-            sub="CSV exports from your bank"
-            acceptLabel="CSV files"
-            accept=".csv,text/csv"
-            chipIcon={<IconFileText size={19} stroke={1.8} />}
-            files={bankFiles}
-            dragActive={bankDrag}
-            setDragActive={setBankDrag}
-            onAdd={addFiles(setBankFiles)}
-            onRemove={removeAt(setBankFiles)}
-            isAllowed={isCsv}
-            artClass={() => styles.csv ?? ""}
-            artIcon={() => <IconFileText size={17} stroke={1.8} />}
-          />
+        <div
+          className={`${styles.afBody} ${singleSection ? styles.afBodySingle : ""} ${styles.thinScroll}`}
+        >
+          {showBank && (
+            <UploadSection
+              title="Bank statements"
+              sub="CSV exports from your bank"
+              acceptLabel="CSV files"
+              accept=".csv,text/csv"
+              chipIcon={<IconFileText size={19} stroke={1.8} />}
+              files={bankFiles}
+              dragActive={bankDrag}
+              setDragActive={setBankDrag}
+              onAdd={addFiles(setBankFiles)}
+              onRemove={removeAt(setBankFiles)}
+              isAllowed={isCsv}
+              artClass={() => styles.csv ?? ""}
+              artIcon={() => <IconFileText size={17} stroke={1.8} />}
+            />
+          )}
 
-          <UploadSection
-            title="Receipts"
-            sub="Images or PDFs — including multi-page PDFs"
-            acceptLabel="Images and PDFs"
-            accept="image/*,application/pdf"
-            chipClass={styles.afChipReceipt}
-            chipIcon={<IconReceipt size={19} stroke={1.8} />}
-            files={receiptFiles}
-            dragActive={receiptDrag}
-            setDragActive={setReceiptDrag}
-            onAdd={addFiles(setReceiptFiles)}
-            onRemove={removeAt(setReceiptFiles)}
-            isAllowed={isReceipt}
-            artClass={(f) =>
-              f.type === "application/pdf" ? styles.pdf ?? "" : styles.image ?? ""
-            }
-            artIcon={(f) =>
-              f.type === "application/pdf" ? (
-                <IconFileText size={17} stroke={1.8} />
-              ) : (
-                <IconPhoto size={17} stroke={1.8} />
-              )
-            }
-          />
+          {showReceipts && (
+            <UploadSection
+              title="Receipts"
+              sub="Images or PDFs — including multi-page PDFs"
+              acceptLabel="Images and PDFs"
+              accept="image/*,application/pdf"
+              chipClass={styles.afChipReceipt}
+              chipIcon={<IconReceipt size={19} stroke={1.8} />}
+              files={receiptFiles}
+              dragActive={receiptDrag}
+              setDragActive={setReceiptDrag}
+              onAdd={addFiles(setReceiptFiles)}
+              onRemove={removeAt(setReceiptFiles)}
+              isAllowed={isReceipt}
+              artClass={(f) =>
+                f.type === "application/pdf" ? styles.pdf ?? "" : styles.image ?? ""
+              }
+              artIcon={(f) =>
+                f.type === "application/pdf" ? (
+                  <IconFileText size={17} stroke={1.8} />
+                ) : (
+                  <IconPhoto size={17} stroke={1.8} />
+                )
+              }
+            />
+          )}
         </div>
 
         <div className={styles.afNote}>
@@ -362,11 +384,11 @@ export function AddFilesModal({
               if (bankFiles.length > 0) onAdd?.(bankFiles);
               onClose();
             }}
-            disabled={totalCount === 0}
+            disabled={relevantCount === 0}
           >
-            {totalCount === 0
+            {relevantCount === 0
               ? "Add files"
-              : `Add ${totalCount} file${totalCount === 1 ? "" : "s"}`}
+              : `Add ${relevantCount} file${relevantCount === 1 ? "" : "s"}`}
           </button>
         </div>
       </div>

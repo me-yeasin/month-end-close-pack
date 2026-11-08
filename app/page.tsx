@@ -58,6 +58,13 @@ export default function Home() {
 
   // add-files modal state
   const [addFilesOpen, setAddFilesOpen] = useState(false);
+  const [addFilesMode, setAddFilesMode] = useState<
+    "all" | "bank" | "receipts"
+  >("all");
+  const openAddFiles = (mode: "all" | "bank" | "receipts") => {
+    setAddFilesMode(mode);
+    setAddFilesOpen(true);
+  };
 
   // AI provider configuration — gates the Add files action.
   const aiProviders = useAiStore((state) => state.providers);
@@ -407,7 +414,7 @@ export default function Home() {
 
               <OverviewScreen
                 aiConfigured={aiConfigured}
-                onAddFiles={() => setAddFilesOpen(true)}
+                onAddFiles={() => openAddFiles("all")}
                 onReview={() => setView("review")}
                 onTransactions={() => setView("transactions")}
                 onExport={() => setView("export")}
@@ -423,6 +430,9 @@ export default function Home() {
               transactions={txRows}
               onEdit={() => setView("review")}
               currency={workspace.currency}
+              onImport={() => openAddFiles("bank")}
+              aiConfigured={aiConfigured}
+              isProcessing={importJob?.status === "processing"}
             />
           )}
 
@@ -491,6 +501,7 @@ export default function Home() {
         open={addFilesOpen}
         onClose={() => setAddFilesOpen(false)}
         onAdd={handleAddFiles}
+        mode={addFilesMode}
       />
     </div>
   );

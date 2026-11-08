@@ -65,10 +65,19 @@ export function TransactionsScreen({
   transactions,
   onEdit,
   currency = "GBP",
+  onImport,
+  aiConfigured = false,
+  isProcessing = false,
 }: {
   transactions: Tx[];
   onEdit?: (id: string) => void;
   currency?: "GBP" | "EUR";
+  /** Open the bank-only Add files dialog (same pipeline as the overview). */
+  onImport?: () => void;
+  /** When false, the Import button is disabled with a "configure AI" hint. */
+  aiConfigured?: boolean;
+  /** When true, an import is already running — disable the button. */
+  isProcessing?: boolean;
 }) {
   const symbol = currency === "EUR" ? "€" : "£";
   const [filters, setFilters] = useState({
@@ -121,9 +130,18 @@ export function TransactionsScreen({
           <button
             type="button"
             className={`${styles.btnSecondary} ${styles.sm}`}
+            onClick={onImport}
+            disabled={!aiConfigured || isProcessing || !onImport}
+            title={
+              !aiConfigured
+                ? "Configure the AI model first"
+                : isProcessing
+                  ? "Import in progress…"
+                  : "Import bank statements"
+            }
           >
             <IconPlus size={14} stroke={1.8} />
-            Import
+            {isProcessing ? "Importing…" : "Import"}
           </button>
         </div>
       </div>
@@ -276,7 +294,19 @@ export function TransactionsScreen({
               >
                 Clear filters
               </button>
-              <button type="button" className={`${styles.btnPrimary} ${styles.sm}`}>
+              <button
+                type="button"
+                className={`${styles.btnPrimary} ${styles.sm}`}
+                onClick={onImport}
+                disabled={!aiConfigured || isProcessing || !onImport}
+                title={
+                  !aiConfigured
+                    ? "Configure the AI model first"
+                    : isProcessing
+                      ? "Import in progress…"
+                      : "Import bank statements"
+                }
+              >
                 <IconPlus size={14} stroke={1.8} />
                 Import bank files
               </button>
