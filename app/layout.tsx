@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Inter } from "next/font/google";
 import "./globals.css";
 
@@ -20,6 +20,12 @@ export const metadata: Metadata = {
   title: "Month-End Pack — Accountant-ready, locally",
   description:
     "Turn a month of bank CSVs and receipts into a clean accountant pack. Local-first, private, and simple.",
+  applicationName: "Month-End Pack",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#173f33",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
