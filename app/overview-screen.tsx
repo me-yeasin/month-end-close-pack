@@ -1,7 +1,7 @@
 "use client";
 
 import styles from "./home.module.css";
-import type { ImportJobRecord, TransactionRecord } from "./db";
+import type { ImportJobRecord, ReceiptRecord, TransactionRecord } from "./db";
 
 const FLAG_LABELS: Record<string, string> = {
   possible_personal: "Possible personal expense",
@@ -36,6 +36,8 @@ export function OverviewScreen({
   transactions,
   job = null,
   currency,
+  receipts = [],
+  receiptProcessing = false,
 }: {
   aiConfigured: boolean;
   /** When true, the Receipts step is hidden (bank-only workspace). */
@@ -47,12 +49,40 @@ export function OverviewScreen({
   transactions: TransactionRecord[];
   job?: ImportJobRecord | null;
   currency: "GBP" | "EUR";
+  /** Receipts for the current month — drives the Receipts pipeline card. */
+  receipts?: ReceiptRecord[];
+  /** True while the receipt queue (OCR + structuring) is running. */
+  receiptProcessing?: boolean;
 }) {
   const hasData = transactions.length > 0;
   const isProcessing = job?.status === "processing";
   const transactionCount = transactions.length;
   const flagged = transactions.filter((t) => t.flag);
   const flaggedCount = flagged.length;
+
+  // receipt pipeline figures
+  const receiptCount = receipts.length;
+  const receiptsRead = receipts.filter(
+    (r) => r.status === "extracted" || r.status === "needs_review",
+  ).length;
+  const receiptsReview = receipts.filter((r) => r.status === "needs_review").length;
+  const receiptsFailed = receipts.filter((r) => r.status === "failed").length;
+  const receiptsUnmatched = receipts.filter(
+    (r) => !r.duplicate && !r.matchId && r.extracted?.total.value != null,
+  ).length;
+  const receiptReadPct =
+    receiptCount > 0 ? Math.round((receiptsRead / receiptCount) * 100) : 0;
+  const receiptSub = [
+    `${receiptCount} receipt${receiptCount !== 1 ? "s" : ""}`,
+    receiptsUnmatched > 0
+      ? `${receiptsUnmatched} unmatched`
+      : receiptsRead > 0
+        ? "all matched"
+        : null,
+    receiptsFailed > 0 ? `${receiptsFailed} failed` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const totalIn = transactions
     .filter((t) => t.amount > 0)
@@ -412,29 +442,82 @@ export function OverviewScreen({
         </article>
 
         {!bankOnly && (
-          <article className={`${styles.step} ${styles.locked}`}>
+          <article
+            className={`${styles.step} ${
+              receiptProcessing || receiptsReview > 0 || receiptsFailed > 0
+                ? styles.active
+                : receiptCount > 0
+                  ? styles.done
+                  : styles.locked
+            }`}
+          >
             <div className={styles.stepTop}>
               <span className={styles.stepIco}>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.7}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
-                  <path d="M9 8h6" />
-                  <path d="M9 12h6" />
-                </svg>
+                {receiptProcessing ? (
+                  <svg
+                    className={styles.spin}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 12a9 9 0 1 1-6.2-8.5" />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.7}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
+                    <path d="M9 8h6" />
+                    <path d="M9 12h6" />
+                  </svg>
+                )}
               </span>
-              <span className={styles.stepStatus}>Not yet</span>
+              <span className={styles.stepStatus}>
+                {receiptProcessing && (
+                  <svg
+                    className={styles.spin}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.4}
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 12a9 9 0 1 1-6.2-8.5" />
+                  </svg>
+                )}
+                {receiptProcessing
+                  ? "Processing"
+                  : receiptCount === 0
+                    ? "Not yet"
+                    : receiptsReview > 0
+                      ? "To review"
+                      : receiptsFailed > 0
+                        ? "Failed"
+                        : "Complete"}
+              </span>
             </div>
             <div className={styles.stepTitle}>Receipts</div>
-            <div className={styles.stepSub}>No receipts yet</div>
+            <div className={styles.stepSub}>
+              {receiptCount === 0 ? "No receipts yet" : receiptSub}
+            </div>
             <div className={styles.stepBar}>
-              <span style={{ width: "0%" }} />
+              <span
+                className={receiptProcessing ? styles.stepBarBusy : undefined}
+                style={{
+                  width: `${receiptProcessing || receiptCount > 0 ? receiptReadPct : 0}%`,
+                }}
+              />
             </div>
           </article>
         )}

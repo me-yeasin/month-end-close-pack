@@ -99,6 +99,7 @@ export default function Home() {
   const removeReceipt = useReceiptStore((state) => state.remove);
   const clearReceipts = useReceiptStore((state) => state.clear);
   const setReceiptMatch = useReceiptStore((state) => state.setReceiptMatch);
+  const receiptsProcessing = useReceiptStore((state) => state.processing);
 
   const activeAiProvider =
     aiProviders.find((p) => p.id === aiActiveProviderId) ?? null;
@@ -505,6 +506,8 @@ export default function Home() {
                 transactions={importTransactions}
                 job={importJob}
                 currency={workspace.currency}
+                receipts={receiptRecords}
+                receiptProcessing={receiptsProcessing}
               />
             </>
           )}
