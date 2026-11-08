@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./home.module.css";
-import { useUiStore, type View } from "./ui-store";
-import React from "react";
+import { useUiStore, type View, type Currency, type VatStatus } from "./ui-store";
+import {
+  createWorkspace as dbCreateWorkspace,
+  setActiveWorkspace as dbSetActive,
+} from "./workspace-store";
 
 type NavItem = {
   id: View;
@@ -88,8 +91,72 @@ export function Sidebar() {
   const view = useUiStore((state) => state.view);
   const setView = useUiStore((state) => state.setView);
   const workspace = useUiStore((state) => state.workspace);
+  const workspaces = useUiStore((state) => state.workspaces);
+  const switchWorkspace = useUiStore((state) => state.switchWorkspace);
+  const addWorkspace = useUiStore((state) => state.addWorkspace);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
+
+  // workspace picker state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // new workspace modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newCurrency, setNewCurrency] = useState<Currency>("GBP");
+  const [newVat, setNewVat] = useState<VatStatus>("unregistered");
+  const [newNameTouched, setNewNameTouched] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Close picker when clicking outside
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [pickerOpen]);
+
+  const openModal = () => {
+    setPickerOpen(false);
+    setNewName("");
+    setNewCurrency("GBP");
+    setNewVat("unregistered");
+    setNewNameTouched(false);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+  };
+
+  const handleCreateWorkspace = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNewNameTouched(true);
+    if (!newName.trim()) return;
+    setSaving(true);
+    try {
+      const record = await dbCreateWorkspace({
+        name: newName.trim(),
+        currency: newCurrency,
+        vatStatus: newVat,
+      });
+      addWorkspace(record);
+      setModalOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSwitchWorkspace = async (id: string) => {
+    setPickerOpen(false);
+    switchWorkspace(id);
+    await dbSetActive(id);
+  };
 
   useEffect(() => {
     if (open) {
@@ -209,21 +276,59 @@ export function Sidebar() {
 
         <div className={styles.workspace}>
           <span className={styles.wsLabel}>Workspace</span>
-          <button type="button" className={styles.wsPicker}>
-            <span className={styles.wsDot} />
-            <span>{workspace?.name ?? "My workspace"}</span>
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+          <div
+            ref={pickerRef}
+            className={`${styles.wsPickerWrap} ${pickerOpen ? styles.wsPickerOpen : ""}`}
+          >
+            <button
+              type="button"
+              className={styles.wsPicker}
+              onClick={() => setPickerOpen((v) => !v)}
+              aria-haspopup="listbox"
+              aria-expanded={pickerOpen}
             >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
+              <span className={styles.wsDot} />
+              <span>{workspace?.name ?? "My workspace"}</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+
+            {pickerOpen && (
+              <div className={styles.wsPopover} role="listbox">
+                {workspaces.map((ws) => (
+                  <button
+                    key={ws.id}
+                    type="button"
+                    role="option"
+                    aria-selected={ws.id === workspace?.id}
+                    className={`${styles.wsPopoverItem} ${ws.id === workspace?.id ? styles.wsActive : ""}`}
+                    onClick={() => handleSwitchWorkspace(ws.id)}
+                  >
+                    <span className={styles.wsPopoverDot} />
+                    <span>{ws.name}</span>
+                    {ws.id === workspace?.id && (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 12, height: 12, marginLeft: "auto", flexShrink: 0 }}>
+                        <path d="m5 12 5 5L20 7" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+                <div className={styles.wsPopoverDivider} />
+                <button
+                  type="button"
+                  className={styles.wsPopoverNew}
+                  onClick={openModal}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                  </svg>
+                  New workspace
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <nav className={styles.nav} aria-label="Main">
@@ -304,6 +409,97 @@ export function Sidebar() {
         </button>
         <span className={styles.concept}>Concept 01 · Home</span>
       </aside>
+
+      {/* ---- New workspace modal ---- */}
+      {modalOpen && (
+        <div
+          className={styles.modalBackdrop}
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+        >
+          <div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="ws-modal-title">
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle} id="ws-modal-title">New workspace</h2>
+              <button type="button" className={styles.modalClose} onClick={closeModal} aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m6 6 12 12" /><path d="M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+
+            <form className={styles.modalForm} onSubmit={handleCreateWorkspace} noValidate>
+              {/* name */}
+              <div className={styles.field}>
+                <label className={styles.fieldLabel} htmlFor="ws-modal-name">
+                  Workspace name
+                  <span style={{ color: "var(--muted)", fontWeight: 400 }}>Required</span>
+                </label>
+                <input
+                  id="ws-modal-name"
+                  type="text"
+                  className={`${styles.fieldInput} ${newNameTouched && !newName.trim() ? styles.error : ""}`}
+                  placeholder="e.g. Side business, Personal"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onBlur={() => setNewNameTouched(true)}
+                  autoComplete="off"
+                  autoFocus
+                  maxLength={60}
+                />
+                {newNameTouched && !newName.trim() && (
+                  <span style={{ color: "var(--red-ink)", fontSize: 11 }}>Please enter a name.</span>
+                )}
+              </div>
+
+              {/* currency */}
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Currency</span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {(["GBP", "EUR"] as Currency[]).map((c) => (
+                    <label
+                      key={c}
+                      className={`${styles.choice} ${newCurrency === c ? styles.selected : ""}`}
+                      style={{ flex: 1 }}
+                    >
+                      <input type="radio" name="modal-currency" value={c} checked={newCurrency === c} onChange={() => setNewCurrency(c)} />
+                      <span className={styles.choiceMark} />
+                      <span className={styles.choiceTitle}>{c === "GBP" ? "£ GBP" : "€ EUR"}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* vat */}
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>VAT status</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {([
+                    { value: "registered" as VatStatus, label: "VAT registered" },
+                    { value: "unregistered" as VatStatus, label: "Not registered" },
+                  ]).map((opt) => (
+                    <label
+                      key={opt.value}
+                      className={`${styles.choice} ${newVat === opt.value ? styles.selected : ""}`}
+                    >
+                      <input type="radio" name="modal-vat" value={opt.value} checked={newVat === opt.value} onChange={() => setNewVat(opt.value)} />
+                      <span className={styles.choiceMark} />
+                      <span className={styles.choiceTitle}>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className={styles.modalActions}>
+                <button type="button" className={`${styles.btnSecondary} ${styles.btnSm}`} onClick={closeModal}>
+                  Cancel
+                </button>
+                <button type="submit" className={`${styles.btnPrimary} ${styles.btnSm}`} disabled={saving}>
+                  {saving ? "Creating…" : "Create workspace"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }

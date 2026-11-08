@@ -12,7 +12,11 @@ import { MonthSummaryScreen } from "./summary-screen";
 import { ExportPackScreen } from "./export-screen";
 import { useUiStore } from "./ui-store";
 import { OnboardingScreen } from "./onboarding";
-import { loadWorkspace, saveWorkspace } from "./workspace-store";
+import {
+  loadAllWorkspaces,
+  loadActiveWorkspaceId,
+  createWorkspace as dbCreateWorkspace,
+} from "./workspace-store";
 
 const VIEW_LABELS: Record<string, string> = {
   overview: "Overview",
@@ -27,7 +31,8 @@ export default function Home() {
   const view = useUiStore((state) => state.view);
   const setView = useUiStore((state) => state.setView);
   const workspace = useUiStore((state) => state.workspace);
-  const createWorkspace = useUiStore((state) => state.createWorkspace);
+  const hydrateWorkspaces = useUiStore((state) => state.hydrateWorkspaces);
+  const addWorkspace = useUiStore((state) => state.addWorkspace);
 
   // true while we are reading IndexedDB on first mount
   const [loading, setLoading] = useState(true);
@@ -35,12 +40,10 @@ export default function Home() {
   const goBack = () => setView("overview");
 
   // On mount: read IndexedDB and hydrate the Zustand store.
-  // This runs only in the browser (useEffect never runs on the server).
+  // useEffect never runs on the server — IndexedDB is browser-only.
   useEffect(() => {
-    loadWorkspace()
-      .then((record) => {
-        if (record) createWorkspace(record);
-      })
+    Promise.all([loadAllWorkspaces(), loadActiveWorkspaceId()])
+      .then(([workspaces, activeId]) => hydrateWorkspaces(workspaces, activeId))
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -52,9 +55,8 @@ export default function Home() {
     return (
       <OnboardingScreen
         onComplete={async (setup) => {
-          const record = { ...setup, id: "singleton" as const, createdAt: new Date().toISOString() };
-          await saveWorkspace(record);
-          createWorkspace(record);
+          const record = await dbCreateWorkspace(setup);
+          addWorkspace(record);
         }}
       />
     );

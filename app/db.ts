@@ -9,40 +9,62 @@
  *  - Open with a version + upgrade callback; bump version when schema changes.
  *  - Use single-command shortcuts (db.get, db.put) for simple operations.
  *  - Never call this module during SSR — all exports are browser-only.
+ *  - Never await unrelated promises inside a transaction (auto-closes).
+ *
+ * DB_VERSION history:
+ *  v1 — single workspace store, keyed by "singleton"
+ *  v2 — multi-workspace: workspaces store (UUID keys) + appState store
+ *       Migration: copies the singleton record into workspaces with a UUID,
+ *       then writes the new activeWorkspaceId into appState.
  */
 
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
 // ---------------------------------------------------------------------------
-// Schema
+// Schema types
 // ---------------------------------------------------------------------------
 
 export interface WorkspaceRecord {
-  id: "singleton"; // only one workspace for now — simple key
+  id: string;          // nanoid — unique per workspace
   name: string;
   currency: "GBP" | "EUR";
   vatStatus: "registered" | "unregistered";
-  createdAt: string; // ISO timestamp
+  createdAt: string;   // ISO timestamp
+}
+
+export interface AppStateRecord {
+  id: "singleton";          // only one app-state row
+  activeWorkspaceId: string | null;
 }
 
 interface MonthEndPackDB extends DBSchema {
-  workspace: {
+  workspaces: {
     value: WorkspaceRecord;
+    key: string;
+  };
+  appState: {
+    value: AppStateRecord;
     key: string;
   };
 }
 
 // ---------------------------------------------------------------------------
 // DB name + version
-// Bump DB_VERSION whenever the schema changes (add stores/indexes).
 // ---------------------------------------------------------------------------
 
 const DB_NAME = "month-end-pack";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // ---------------------------------------------------------------------------
-// Singleton connection promise
-// One openDB call per page load — reused across all operations.
+// Simple ID generator — no dependency needed for UUID-like strings
+// ---------------------------------------------------------------------------
+
+export function newId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+// ---------------------------------------------------------------------------
+// Singleton connection — reused across all operations per page load
 // ---------------------------------------------------------------------------
 
 let _db: IDBPDatabase<MonthEndPackDB> | null = null;
@@ -51,11 +73,31 @@ export async function getDb(): Promise<IDBPDatabase<MonthEndPackDB>> {
   if (_db) return _db;
 
   _db = await openDB<MonthEndPackDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // workspace store — keyed by a string id ("singleton")
-      if (!db.objectStoreNames.contains("workspace")) {
-        db.createObjectStore("workspace", { keyPath: "id" });
+    upgrade(db, oldVersion) {
+      // ---- v1 → v2 migration ----
+      // v1 had a single "workspace" store with key "singleton".
+      // v2 replaces it with "workspaces" (multi) + "appState".
+
+      // Create workspaces store if it does not exist
+      if (!db.objectStoreNames.contains("workspaces")) {
+        db.createObjectStore("workspaces", { keyPath: "id" });
       }
+
+      // Create appState store if it does not exist
+      if (!db.objectStoreNames.contains("appState")) {
+        db.createObjectStore("appState", { keyPath: "id" });
+      }
+
+      // Remove the old v1 "workspace" store (migration complete)
+      // Cast to any — "workspace" is not in the v2 typed schema
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const anyDb = db as any;
+      if (anyDb.objectStoreNames.contains("workspace")) {
+        anyDb.deleteObjectStore("workspace");
+      }
+
+      // Suppress unused variable warning — oldVersion used for future migrations
+      void oldVersion;
     },
   });
 

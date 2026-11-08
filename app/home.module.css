@@ -147,12 +147,16 @@
   text-transform: uppercase;
 }
 
+.wsPickerWrap {
+  position: relative;
+  margin-top: 8px;
+}
+
 .wsPicker {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  margin-top: 8px;
   padding: 9px 10px;
   border: 1px solid var(--line);
   border-radius: 11px;
@@ -163,7 +167,8 @@
   transition: border-color 0.15s, background 0.15s;
 }
 
-.wsPicker:hover {
+.wsPicker:hover,
+.wsPickerOpen .wsPicker {
   border-color: var(--line-strong);
   background: #fffefb;
 }
@@ -182,6 +187,201 @@
   height: 14px;
   margin-left: auto;
   color: var(--muted);
+  transition: transform 0.15s;
+}
+
+.wsPickerOpen .wsPicker svg {
+  transform: rotate(180deg);
+}
+
+/* ---- workspace popover ---- */
+
+.wsPopover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow:
+    0 1px 0 rgba(24, 36, 30, 0.03),
+    0 16px 32px -20px rgba(24, 36, 30, 0.3),
+    0 4px 12px -6px rgba(24, 36, 30, 0.1);
+  animation: popoverIn 0.14s ease;
+}
+
+@keyframes popoverIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.wsPopoverItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 9px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.wsPopoverItem:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.wsPopoverItem.wsActive {
+  background: var(--sage);
+  color: var(--forest);
+  font-weight: 600;
+}
+
+.wsPopoverDot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 0 2.5px var(--paper-2);
+}
+
+.wsPopoverItem.wsActive .wsPopoverDot {
+  background: var(--forest-3);
+  box-shadow: 0 0 0 2.5px var(--sage);
+}
+
+.wsPopoverDivider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--line);
+}
+
+.wsPopoverNew {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 9px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--forest-3);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.wsPopoverNew:hover {
+  background: var(--sage);
+}
+
+.wsPopoverNew svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+
+/* ---- workspace modal ---- */
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(24, 36, 30, 0.38);
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.16s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal {
+  width: 100%;
+  max-width: 420px;
+  padding: 26px 24px 22px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow:
+    0 2px 0 rgba(24, 36, 30, 0.04),
+    0 32px 64px -32px rgba(24, 36, 30, 0.45);
+  animation: modalIn 0.18s ease;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.97) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.018em;
+  color: var(--ink);
+}
+
+.modalClose {
+  display: grid;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.modalClose:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.modalClose svg {
+  width: 14px;
+  height: 14px;
+}
+
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modalActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
 }
 
 .nav {

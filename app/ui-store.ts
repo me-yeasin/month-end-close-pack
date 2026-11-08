@@ -12,7 +12,7 @@ export type Currency = "GBP" | "EUR";
 export type VatStatus = "registered" | "unregistered";
 
 export interface Workspace {
-  id: "singleton";
+  id: string;
   name: string;
   currency: Currency;
   vatStatus: VatStatus;
@@ -30,12 +30,20 @@ type UiState = {
   view: View;
   setView: (view: View) => void;
 
-  // workspace
+  // workspaces
+  workspaces: Workspace[];
+  activeWorkspaceId: string | null;
+  /** Active workspace derived from the list — null if list is empty */
   workspace: Workspace | null;
-  createWorkspace: (ws: Workspace) => void;
+  /** Bulk-hydrate after reading IndexedDB on mount */
+  hydrateWorkspaces: (workspaces: Workspace[], activeId: string | null) => void;
+  /** Add a newly-created workspace and make it active */
+  addWorkspace: (ws: Workspace) => void;
+  /** Switch the active workspace */
+  switchWorkspace: (id: string) => void;
 };
 
-export const useUiStore = create<UiState>((set) => ({
+export const useUiStore = create<UiState>((set, get) => ({
   // sidebar
   sidebarOpen: false,
   openSidebar: () => set({ sidebarOpen: true }),
@@ -46,7 +54,30 @@ export const useUiStore = create<UiState>((set) => ({
   view: "overview",
   setView: (view) => set({ view }),
 
-  // workspace
+  // workspaces
+  workspaces: [],
+  activeWorkspaceId: null,
   workspace: null,
-  createWorkspace: (ws) => set({ workspace: ws }),
+
+  hydrateWorkspaces: (workspaces, activeId) => {
+    const active = workspaces.find((w) => w.id === activeId) ?? workspaces[0] ?? null;
+    set({
+      workspaces,
+      activeWorkspaceId: active?.id ?? null,
+      workspace: active,
+    });
+  },
+
+  addWorkspace: (ws) => {
+    set((state) => ({
+      workspaces: [...state.workspaces, ws],
+      activeWorkspaceId: ws.id,
+      workspace: ws,
+    }));
+  },
+
+  switchWorkspace: (id) => {
+    const ws = get().workspaces.find((w) => w.id === id) ?? null;
+    set({ activeWorkspaceId: id, workspace: ws });
+  },
 }));
