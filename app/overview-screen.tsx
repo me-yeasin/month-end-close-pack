@@ -28,6 +28,7 @@ const amberStyle = {
 
 export function OverviewScreen({
   aiConfigured,
+  bankOnly = false,
   onAddFiles,
   onReview,
   onTransactions,
@@ -37,6 +38,8 @@ export function OverviewScreen({
   currency,
 }: {
   aiConfigured: boolean;
+  /** When true, the Receipts step is hidden (bank-only workspace). */
+  bankOnly?: boolean;
   onAddFiles: () => void;
   onReview: () => void;
   onTransactions: () => void;
@@ -374,31 +377,33 @@ export function OverviewScreen({
           </div>
         </article>
 
-        <article className={`${styles.step} ${styles.locked}`}>
-          <div className={styles.stepTop}>
-            <span className={styles.stepIco}>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.7}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
-                <path d="M9 8h6" />
-                <path d="M9 12h6" />
-              </svg>
-            </span>
-            <span className={styles.stepStatus}>Not yet</span>
-          </div>
-          <div className={styles.stepTitle}>Receipts</div>
-          <div className={styles.stepSub}>No receipts yet</div>
-          <div className={styles.stepBar}>
-            <span style={{ width: "0%" }} />
-          </div>
-        </article>
+        {!bankOnly && (
+          <article className={`${styles.step} ${styles.locked}`}>
+            <div className={styles.stepTop}>
+              <span className={styles.stepIco}>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.7}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
+                  <path d="M9 8h6" />
+                  <path d="M9 12h6" />
+                </svg>
+              </span>
+              <span className={styles.stepStatus}>Not yet</span>
+            </div>
+            <div className={styles.stepTitle}>Receipts</div>
+            <div className={styles.stepSub}>No receipts yet</div>
+            <div className={styles.stepBar}>
+              <span style={{ width: "0%" }} />
+            </div>
+          </article>
+        )}
 
         <article className={`${styles.step} ${matchClass}`}>
           <div className={styles.stepTop}>

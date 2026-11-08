@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export type View =
   | "overview"
@@ -49,9 +50,16 @@ type UiState = {
   removeWorkspace: (id: string, newActiveId: string | null) => void;
   /** Update the active workspace's selected period (month + year). */
   setPeriod: (month: number, year: number) => void;
+
+  // bank-only mode (global, persisted preference)
+  bankOnly: boolean;
+  setBankOnly: (value: boolean) => void;
+  toggleBankOnly: () => void;
 };
 
-export const useUiStore = create<UiState>((set, get) => ({
+export const useUiStore = create<UiState>()(
+  persist(
+    (set, get) => ({
   // sidebar
   sidebarOpen: false,
   openSidebar: () => set({ sidebarOpen: true }),
@@ -113,4 +121,22 @@ export const useUiStore = create<UiState>((set, get) => ({
       workspace: updated.find((w) => w.id === activeWorkspaceId) ?? null,
     });
   },
-}));
+
+  // bank-only mode
+  bankOnly: false,
+  setBankOnly: (value) => set({ bankOnly: value }),
+  toggleBankOnly: () => set((state) => ({ bankOnly: !state.bankOnly })),
+}),
+    {
+      name: "mep-ui-prefs",
+      storage: createJSONStorage(() =>
+        typeof window !== "undefined"
+          ? window.localStorage
+          : (undefined as unknown as Storage),
+      ),
+      // Only persist the user preference; everything else is hydrated from
+      // IndexedDB on mount.
+      partialize: (state) => ({ bankOnly: state.bankOnly }),
+    },
+  ),
+);

@@ -13,6 +13,7 @@ import {
   IconCloudOff,
 } from "@tabler/icons-react";
 import styles from "./home.module.css";
+import { useUiStore } from "./ui-store";
 
 interface ReceiptFile {
   id: string;
@@ -74,7 +75,8 @@ export function ReceiptImportScreen({
   onUpload?: (files: File[]) => void;
 }) {
   const [dragActive, setDragActive] = useState(false);
-  const [bankOnly, setBankOnly] = useState(false);
+  const bankOnly = useUiStore((s) => s.bankOnly);
+  const setBankOnly = useUiStore((s) => s.setBankOnly);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const accepted = ALLOWED.join(",");
@@ -138,7 +140,7 @@ export function ReceiptImportScreen({
           <button
             type="button"
             className={`${styles.toggle} ${bankOnly ? styles.toggleOn : ""}`}
-            onClick={() => setBankOnly((v) => !v)}
+            onClick={() => setBankOnly(!bankOnly)}
             role="switch"
             aria-checked={bankOnly}
             aria-label="Bank-only mode"

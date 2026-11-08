@@ -47,6 +47,7 @@ function formatTxDate(iso: string): string {
 export default function Home() {
   const view = useUiStore((state) => state.view);
   const setView = useUiStore((state) => state.setView);
+  const bankOnly = useUiStore((state) => state.bankOnly);
   const workspace = useUiStore((state) => state.workspace);
   const hydrateWorkspaces = useUiStore((state) => state.hydrateWorkspaces);
   const addWorkspace = useUiStore((state) => state.addWorkspace);
@@ -144,6 +145,11 @@ export default function Home() {
     if (!workspace) return;
     void hydrateImport(workspace.id, workspace.month, workspace.year);
   }, [workspace?.id, workspace?.month, workspace?.year, hydrateImport]);
+
+  // Bank-only mode hides the Receipts view — bounce the user out if they're on it.
+  useEffect(() => {
+    if (bankOnly && view === "receipts") setView("overview");
+  }, [bankOnly, view, setView]);
 
   // Avoid flashing onboarding on page load while we check IndexedDB
   if (loading) return null;
@@ -362,7 +368,8 @@ export default function Home() {
 
               <OverviewScreen
                 aiConfigured={aiConfigured}
-                onAddFiles={() => openAddFiles("all")}
+                bankOnly={bankOnly}
+                onAddFiles={() => openAddFiles(bankOnly ? "bank" : "all")}
                 onReview={() => setView("review")}
                 onTransactions={() => setView("transactions")}
                 onExport={() => setView("export")}

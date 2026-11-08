@@ -96,6 +96,7 @@ export function Sidebar({ reviewCount = 0 }: { reviewCount?: number }) {
   const switchWorkspace = useUiStore((state) => state.switchWorkspace);
   const addWorkspace = useUiStore((state) => state.addWorkspace);
   const removeWorkspace = useUiStore((state) => state.removeWorkspace);
+  const bankOnly = useUiStore((state) => state.bankOnly);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
 
@@ -408,7 +409,9 @@ export function Sidebar({ reviewCount = 0 }: { reviewCount?: number }) {
         </div>
 
         <nav className={styles.nav} aria-label="Main">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter(
+            (item) => !(bankOnly && item.id === "receipts"),
+          ).map((item) => {
             const badge = item.id === "review" ? reviewCount : item.badge;
             return (
               <button
