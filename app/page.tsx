@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import styles from "./home.module.css";
 import { MobileMenuButton } from "./mobile-menu-button";
 import { Sidebar } from "./sidebar";
@@ -11,6 +12,7 @@ import { MonthSummaryScreen } from "./summary-screen";
 import { ExportPackScreen } from "./export-screen";
 import { useUiStore } from "./ui-store";
 import { OnboardingScreen } from "./onboarding";
+import { loadWorkspace, saveWorkspace } from "./workspace-store";
 
 const VIEW_LABELS: Record<string, string> = {
   overview: "Overview",
@@ -27,18 +29,33 @@ export default function Home() {
   const workspace = useUiStore((state) => state.workspace);
   const createWorkspace = useUiStore((state) => state.createWorkspace);
 
+  // true while we are reading IndexedDB on first mount
+  const [loading, setLoading] = useState(true);
+
   const goBack = () => setView("overview");
 
-  // Show onboarding until the workspace is created
+  // On mount: read IndexedDB and hydrate the Zustand store.
+  // This runs only in the browser (useEffect never runs on the server).
+  useEffect(() => {
+    loadWorkspace()
+      .then((record) => {
+        if (record) createWorkspace(record);
+      })
+      .finally(() => setLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Avoid flashing onboarding on page load while we check IndexedDB
+  if (loading) return null;
+
+  // Show onboarding if no workspace exists yet
   if (!workspace) {
     return (
       <OnboardingScreen
-        onComplete={(setup) =>
-          createWorkspace({
-            ...setup,
-            createdAt: new Date().toISOString(),
-          })
-        }
+        onComplete={async (setup) => {
+          const record = { ...setup, id: "singleton" as const, createdAt: new Date().toISOString() };
+          await saveWorkspace(record);
+          createWorkspace(record);
+        }}
       />
     );
   }

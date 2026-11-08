@@ -12,6 +12,7 @@ export type Currency = "GBP" | "EUR";
 export type VatStatus = "registered" | "unregistered";
 
 export interface Workspace {
+  id: "singleton";
   name: string;
   currency: Currency;
   vatStatus: VatStatus;
