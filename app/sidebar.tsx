@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import styles from "./home.module.css";
 import { useUiStore, type View, type Currency, type VatStatus } from "./ui-store";
 import {
@@ -17,6 +18,87 @@ type NavItem = {
   badge?: number;
   icon: React.ReactNode;
 };
+
+/** `useLayoutEffect` in the browser, `useEffect` during SSR (no React warning). */
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/**
+ * Fixed-position popover anchoring (floating-UI pattern).
+ *
+ * Popovers rendered inside the sidebar inherit its width and clipping — on
+ * tablet the sidebar collapses to an 82px icon rail, which used to squeeze the
+ * workspace popover into that rail and clip every row. Rendering the popover
+ * through a portal into document.body with `position: fixed` escapes every
+ * ancestor, so it always sizes to its content, anchored to the trigger's
+ * viewport rect and clamped to the viewport. Re-anchors on resize and on any
+ * scroll (including scrolls inside the drawer).
+ */
+function useFixedAnchor(
+  open: boolean,
+  anchorRef: React.RefObject<HTMLElement | null>,
+  preferredWidth: number,
+): React.CSSProperties {
+  // Hidden until measured so the popover never flashes at the body's top-left.
+  const [style, setStyle] = useState<React.CSSProperties>({
+    position: "fixed",
+    top: 0,
+    left: 0,
+    visibility: "hidden",
+    zIndex: 250,
+  });
+
+  useIsomorphicLayoutEffect(() => {
+    if (!open) return;
+
+    const MARGIN = 8;
+    const GAP = 6;
+
+    const update = () => {
+      const el = anchorRef.current;
+      if (!el) return;
+
+      const rect = el.getBoundingClientRect();
+      const viewportW = window.innerWidth;
+      const viewportH = window.innerHeight;
+      // never wider than the viewport (keeps the popover usable on phones)
+      const width = Math.min(preferredWidth, viewportW - MARGIN * 2);
+      const left = Math.max(
+        MARGIN,
+        Math.min(rect.left, viewportW - width - MARGIN),
+      );
+
+      const spaceBelow = viewportH - rect.bottom - MARGIN;
+      const spaceAbove = rect.top - MARGIN;
+      // flip above the trigger when there is little room below
+      const openUp = spaceBelow < 220 && spaceAbove > spaceBelow;
+      const available = Math.max(140, (openUp ? spaceAbove : spaceBelow) - GAP);
+
+      setStyle({
+        position: "fixed",
+        left,
+        width,
+        top: openUp ? "auto" : Math.min(rect.bottom + GAP, viewportH - 80),
+        right: "auto",
+        bottom: openUp ? viewportH - rect.top + GAP : "auto",
+        maxHeight: available,
+        overflowY: "auto",
+        visibility: "visible",
+        zIndex: 250,
+      });
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open, anchorRef, preferredWidth]);
+
+  return style;
+}
 
 const NAV_ITEMS: NavItem[] = [
   {
@@ -110,11 +192,15 @@ export function Sidebar({
 
   // workspace picker state
   const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null); // trigger (wrap)
+  const wsPopRef = useRef<HTMLDivElement>(null); // portaled popover
+  const wsPopStyle = useFixedAnchor(pickerOpen, pickerRef, 280);
 
   // month picker state (visible only inside the mobile drawer)
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
-  const monthWrapRef = useRef<HTMLDivElement>(null);
+  const monthWrapRef = useRef<HTMLDivElement>(null); // trigger (wrap)
+  const monthPopRef = useRef<HTMLDivElement>(null); // portaled popover
+  const monthPopStyle = useFixedAnchor(monthPickerOpen, monthWrapRef, 250);
 
   // delete confirmation state
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -128,11 +214,15 @@ export function Sidebar({
   const [newNameTouched, setNewNameTouched] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Close picker when clicking outside
+  // Close picker when clicking outside (ignore clicks inside the portaled popover)
   useEffect(() => {
     if (!pickerOpen) return;
     const handler = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        !pickerRef.current?.contains(target) &&
+        !wsPopRef.current?.contains(target)
+      ) {
         setPickerOpen(false);
       }
     };
@@ -144,7 +234,11 @@ export function Sidebar({
   useEffect(() => {
     if (!monthPickerOpen) return;
     const handler = (e: MouseEvent) => {
-      if (monthWrapRef.current && !monthWrapRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        !monthWrapRef.current?.contains(target) &&
+        !monthPopRef.current?.contains(target)
+      ) {
         setMonthPickerOpen(false);
       }
     };
@@ -214,6 +308,9 @@ export function Sidebar({
       closeButtonRef.current?.focus({ preventScroll: true });
     } else if (wasOpen.current) {
       wasOpen.current = false;
+      // the drawer is closing — its portalled popovers must not linger
+      setPickerOpen(false);
+      setMonthPickerOpen(false);
       document.body.style.overflow = "";
       document
         .getElementById("mobile-menu-button")
@@ -230,6 +327,12 @@ export function Sidebar({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        // Escape closes the open popover first, the drawer second.
+        if (pickerOpen || monthPickerOpen) {
+          setPickerOpen(false);
+          setMonthPickerOpen(false);
+          return;
+        }
         closeSidebar();
         return;
       }
@@ -258,7 +361,7 @@ export function Sidebar({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, closeSidebar]);
+  }, [open, closeSidebar, pickerOpen, monthPickerOpen]);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 721px)");
@@ -272,6 +375,8 @@ export function Sidebar({
 
   const navigate = (id: View) => {
     setView(id);
+    setPickerOpen(false);
+    setMonthPickerOpen(false);
     closeSidebar();
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -293,7 +398,11 @@ export function Sidebar({
           ref={closeButtonRef}
           type="button"
           className={styles.drawerClose}
-          onClick={closeSidebar}
+          onClick={() => {
+            setPickerOpen(false);
+            setMonthPickerOpen(false);
+            closeSidebar();
+          }}
           aria-label="Close navigation"
         >
           <svg
@@ -336,16 +445,28 @@ export function Sidebar({
               onClick={() => setPickerOpen((v) => !v)}
               aria-haspopup="listbox"
               aria-expanded={pickerOpen}
+              aria-label={
+                workspace
+                  ? `Workspace ${workspace.name}. Switch or create a workspace.`
+                  : "My workspace. Switch or create a workspace."
+              }
+              title={workspace?.name ?? "My workspace"}
             >
               <span className={styles.wsDot} />
-              <span>{workspace?.name ?? "My workspace"}</span>
+              <span className={styles.wsPickerName}>{workspace?.name ?? "My workspace"}</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="m6 9 6 6 6-6" />
               </svg>
             </button>
 
-            {pickerOpen && (
-              <div className={styles.wsPopover} role="listbox">
+            {pickerOpen &&
+              createPortal(
+                <div
+                  ref={wsPopRef}
+                  className={`${styles.popoverLayer} ${styles.wsPopover}`}
+                  style={wsPopStyle}
+                  role="listbox"
+                >
                 {workspaces.map((ws) => (
                   <div key={ws.id} className={styles.wsPopoverRow}>
                     {confirmDeleteId === ws.id ? (
@@ -428,8 +549,9 @@ export function Sidebar({
                   </svg>
                   New workspace
                 </button>
-              </div>
-            )}
+              </div>,
+                document.body
+              )}
           </div>
         </div>
 
@@ -459,17 +581,24 @@ export function Sidebar({
               </svg>
             </button>
 
-            {monthPickerOpen && workspace && (
-              <MonthPicker
-                month={workspace.month}
-                year={workspace.year}
-                onSelect={(month, year) => {
-                  onSelectPeriod?.(month, year);
-                  setMonthPickerOpen(false);
-                }}
-                onClose={() => setMonthPickerOpen(false)}
-              />
-            )}
+            {monthPickerOpen &&
+              workspace &&
+              createPortal(
+                <div ref={monthPopRef}>
+                  <MonthPicker
+                    month={workspace.month}
+                    year={workspace.year}
+                    className={styles.popoverLayer}
+                    style={monthPopStyle}
+                    onSelect={(month, year) => {
+                      onSelectPeriod?.(month, year);
+                      setMonthPickerOpen(false);
+                    }}
+                    onClose={() => setMonthPickerOpen(false)}
+                  />
+                </div>,
+                document.body,
+              )}
           </div>
         </div>
 

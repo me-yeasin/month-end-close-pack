@@ -53,7 +53,13 @@ async function ocrBlob(
   onProgress?: (pct: number) => void,
 ): Promise<{ text: string; confidence: number }> {
   const Tesseract = await import("tesseract.js");
-  const worker = await Tesseract.createWorker("eng");
+  const worker = await Tesseract.createWorker("eng", 1, {
+    logger: (m) => {
+      if (m.status === "recognizing text" && typeof m.progress === "number") {
+        onProgress?.(Math.round(m.progress * 100));
+      }
+    },
+  });
   try {
     const result = await worker.recognize(blob);
     return {

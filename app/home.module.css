@@ -222,6 +222,16 @@
   box-shadow: 0 0 0 3px var(--sage);
 }
 
+/* workspace name inside the picker — truncates instead of stretching the pill */
+.wsPickerName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
 .wsPicker svg {
   width: 14px;
   height: 14px;
@@ -235,6 +245,34 @@
 }
 
 /* ---- workspace popover ---- */
+
+/* Portalled popovers render into document.body, outside `.shell`, so they
+   would otherwise lose every design token. Re-declare the palette on the
+   portal root so the popover keeps its surface, borders and colours. */
+.popoverLayer {
+  --paper: #f3f0e7;
+  --paper-2: #ece8dc;
+  --surface: #fffdf8;
+  --surface-2: #f8f5ec;
+  --ink: #18241e;
+  --ink-2: #3e4a43;
+  --muted: #7c857d;
+  --line: #e3ded1;
+  --line-strong: #d4cebd;
+  --forest: #173f33;
+  --forest-2: #1e4c3d;
+  --forest-3: #2a6350;
+  --sage: #dde9de;
+  --amber: #e7b24a;
+  --amber-soft: #f7e9c6;
+  --amber-ink: #7a5413;
+  --red-soft: #f4e1db;
+  --red-ink: #8c3a28;
+  --blue-soft: #e5edf3;
+  --blue-ink: #3e6b8a;
+  --font-ui: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
+}
 
 .wsPopover {
   position: absolute;
@@ -251,6 +289,12 @@
     0 16px 32px -20px rgba(24, 36, 30, 0.3),
     0 4px 12px -6px rgba(24, 36, 30, 0.1);
   animation: popoverIn 0.14s ease;
+}
+
+/* never let the picker rows wrap, however narrow the container gets */
+.wsPopoverItem,
+.wsPopoverNew {
+  white-space: nowrap;
 }
 
 @keyframes popoverIn {
@@ -5596,7 +5640,9 @@
     transform: translateX(0);
     visibility: visible;
     transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
-    overflow: hidden;
+    /* scroll the drawer on short screens instead of clipping its content */
+    overflow-y: auto;
+    overflow-x: clip;
   }
 
   .scrim {

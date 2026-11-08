@@ -12,6 +12,10 @@ interface MonthPickerProps {
   onSelect: (month: number, year: number) => void;
   /** Request close (Escape key). Outside-click is handled by the parent. */
   onClose: () => void;
+  /** Extra class, e.g. to carry design tokens when portalled outside `.shell`. */
+  className?: string;
+  /** Optional fixed-position style when portalled out of a clipped ancestor. */
+  style?: React.CSSProperties;
 }
 
 /**
@@ -24,7 +28,14 @@ interface MonthPickerProps {
  *  - Escape closes it. Outside-click closing is owned by the parent so the
  *    trigger button can toggle without a double-fire race.
  */
-export function MonthPicker({ month, year, onSelect, onClose }: MonthPickerProps) {
+export function MonthPicker({
+  month,
+  year,
+  onSelect,
+  onClose,
+  className,
+  style,
+}: MonthPickerProps) {
   // Local view year lets the user browse other years without committing.
   const [viewYear, setViewYear] = useState(year);
   const today = currentPeriod();
@@ -39,7 +50,12 @@ export function MonthPicker({ month, year, onSelect, onClose }: MonthPickerProps
   }, [onClose]);
 
   return (
-    <div className={styles.monthPopover} role="dialog" aria-label="Select month and year">
+    <div
+      className={`${styles.monthPopover}${className ? ` ${className}` : ""}`}
+      style={style}
+      role="dialog"
+      aria-label="Select month and year"
+    >
       <div className={styles.monthPopHead}>
         <button
           type="button"
