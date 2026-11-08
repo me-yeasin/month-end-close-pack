@@ -92,7 +92,56 @@ export interface TransactionRecord {
   category?: string;
   /** VAT treatment chosen by the user, if any. */
   vatTreatment?: "included" | "excluded" | "not_applicable";
+  /** Matched receipt id (set by the matching engine or manual match). */
+  matchId?: string;
   createdAt: string;
+}
+
+/** One extracted field with its confidence (0–1). */
+export interface ExtractedField<T> {
+  value: T;
+  confidence: number;
+}
+
+/** Extracted receipt data — every field carries its own confidence. */
+export interface ExtractedReceipt {
+  vendor: ExtractedField<string>;
+  date: ExtractedField<string | null>; // ISO date or null
+  total: ExtractedField<number | null>;
+  currency: ExtractedField<string>;
+  vat: ExtractedField<number | null>;
+  paymentMethod: ExtractedField<string | null>;
+}
+
+/** A receipt uploaded by the user (image or PDF, stored locally as a Blob). */
+export interface ReceiptRecord {
+  id: string;
+  workspaceId: string;
+  month: number; // 0-11
+  year: number;
+  originalName: string;
+  /** SHA-256 of the file contents — used for de-duplication. */
+  hash: string;
+  size: number;
+  mimeType: string;
+  /** The original file bytes, kept locally for the export pack. */
+  blob: Blob;
+  pageCount?: number;
+  status: "queued" | "processing" | "extracted" | "needs_review" | "failed";
+  /** Raw OCR/text-layer output, kept for audit. */
+  ocrText?: string;
+  /** Mean OCR confidence (0–1), null when no OCR was needed. */
+  ocrConfidence?: number | null;
+  extracted?: ExtractedReceipt;
+  /** Matched bank transaction id (set by the matching engine). */
+  matchId?: string;
+  matchType?: "exact" | "fuzzy";
+  matchConfidence?: number;
+  /** Set when the same file was already imported this month. */
+  duplicate?: boolean;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** A bank-import job (one per upload batch). */
@@ -133,6 +182,11 @@ interface MonthEndPackDB extends DBSchema {
     key: string;
     indexes: { byWorkspace: string };
   };
+  receipts: {
+    value: ReceiptRecord;
+    key: string;
+    indexes: { byWorkspace: string };
+  };
   importJobs: {
     value: ImportJobRecord;
     key: string;
@@ -145,7 +199,7 @@ interface MonthEndPackDB extends DBSchema {
 // ---------------------------------------------------------------------------
 
 const DB_NAME = "month-end-pack";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 // ---------------------------------------------------------------------------
 // Simple ID generator — no dependency needed for UUID-like strings
@@ -194,6 +248,12 @@ export async function getDb(): Promise<IDBPDatabase<MonthEndPackDB>> {
       // Create importJobs store (v4)
       if (!db.objectStoreNames.contains("importJobs")) {
         const store = db.createObjectStore("importJobs", { keyPath: "id" });
+        store.createIndex("byWorkspace", "workspaceId");
+      }
+
+      // Create receipts store (v5)
+      if (!db.objectStoreNames.contains("receipts")) {
+        const store = db.createObjectStore("receipts", { keyPath: "id" });
         store.createIndex("byWorkspace", "workspaceId");
       }
 

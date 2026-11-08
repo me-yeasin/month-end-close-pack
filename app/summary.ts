@@ -11,7 +11,7 @@
  *  - VAT totals stay zero until transactions carry a vatTreatment
  */
 
-import type { TransactionRecord } from "./db";
+import type { ReceiptRecord, TransactionRecord } from "./db";
 
 export interface SummaryCategory {
   name: string;
@@ -78,6 +78,7 @@ export function buildSummary(
   transactions: TransactionRecord[],
   monthLabel: string,
   currency: "GBP" | "EUR",
+  receipts: ReceiptRecord[] = [],
 ): SummaryData {
   let totalIn = 0;
   let totalOut = 0;
@@ -123,6 +124,16 @@ export function buildSummary(
   const duplicates = byFlagType.get("duplicate_transaction")?.count ?? 0;
   const uncategorised = transactions.filter((t) => !t.categoryId).length;
 
+  // receipt-side figures
+  // unmatched: a receipt with extracted total that no bank transaction claimed
+  const unmatchedReceipts = receipts.filter(
+    (r) =>
+      !r.duplicate &&
+      !r.matchId &&
+      (r.status === "extracted" || r.status === "needs_review"),
+  ).length;
+  const duplicateReceipts = receipts.filter((r) => r.duplicate).length;
+
   return {
     monthLabel,
     currency,
@@ -134,8 +145,8 @@ export function buildSummary(
     vat: { included: 0, excluded: 0, rate: 0, net: 0 },
     counts: {
       missingReceipts: 0,
-      unmatchedReceipts: 0,
-      duplicates,
+      unmatchedReceipts,
+      duplicates: duplicates + duplicateReceipts,
       uncategorised,
       lowConfidence: 0,
     },

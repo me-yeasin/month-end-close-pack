@@ -197,15 +197,13 @@ function UploadSection({
 }
 
 export function AddFilesModal({
-  open,
   onClose,
   onAdd,
   mode = "all",
 }: {
-  open: boolean;
   onClose: () => void;
-  /** Hand the chosen bank statement files to the app for processing. */
-  onAdd?: (bankFiles: File[]) => void;
+  /** Hand the chosen files to the app: bank statements and/or receipts. */
+  onAdd?: (bankFiles: File[], receiptFiles: File[]) => void;
   /** Which sections to show: both (overview), bank only (transactions), or receipts only. */
   mode?: "all" | "bank" | "receipts";
 }) {
@@ -214,27 +212,17 @@ export function AddFilesModal({
   const [bankDrag, setBankDrag] = useState(false);
   const [receiptDrag, setReceiptDrag] = useState(false);
 
-  // Fresh state each time the modal opens.
-  useEffect(() => {
-    if (!open) {
-      setBankFiles([]);
-      setReceiptFiles([]);
-      setBankDrag(false);
-      setReceiptDrag(false);
-    }
-  }, [open]);
+  // The parent mounts this component only while the modal is open, so local
+  // state resets naturally on close — no reset effect needed.
 
   // Escape closes.
   useEffect(() => {
-    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
+  }, [onClose]);
 
   // Append while ignoring any file that is already in the list.
   const addFiles = (setter: React.Dispatch<React.SetStateAction<File[]>>) => (
@@ -381,7 +369,9 @@ export function AddFilesModal({
             type="button"
             className={styles.btnPrimary}
             onClick={() => {
-              if (bankFiles.length > 0) onAdd?.(bankFiles);
+              if (bankFiles.length > 0 || receiptFiles.length > 0) {
+                onAdd?.(bankFiles, receiptFiles);
+              }
               onClose();
             }}
             disabled={relevantCount === 0}

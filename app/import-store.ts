@@ -45,6 +45,8 @@ type ImportState = {
   resolveTransactions: (ids: string[], resolution: ReviewResolution) => Promise<void>;
   /** Assign a category and mark the transactions reviewed. */
   setCategory: (ids: string[], categoryId: string) => Promise<void>;
+  /** Set/clear the matched receipt on one transaction (matching engine). */
+  setTransactionMatch: (id: string, receiptId: string | null) => Promise<void>;
   reset: () => void;
 };
 
@@ -293,6 +295,28 @@ export const useImportStore = create<ImportState>((set, get) => ({
       await persistTransactions(updates);
     } catch (err) {
       console.error("Failed to persist category", err);
+    }
+  },
+
+  setTransactionMatch: async (id, receiptId) => {
+    const updated = get()
+      .transactions.filter((t) => t.id === id)
+      .map<TransactionRecord>((t) => ({
+        ...t,
+        matchId: receiptId ?? undefined,
+      }));
+    if (updated.length === 0) return;
+
+    set((state) => ({
+      transactions: state.transactions.map((t) =>
+        t.id === id ? updated[0] : t,
+      ),
+    }));
+
+    try {
+      await persistTransactions(updated);
+    } catch (err) {
+      console.error("Failed to persist transaction match", err);
     }
   },
 }));

@@ -2970,6 +2970,16 @@
   font-size: 10.5px;
 }
 
+.rxMatch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  color: var(--forest-3);
+  font-size: 10.5px;
+  font-weight: 550;
+}
+
 .rxProgress {
   display: flex;
   flex: 0 0 auto;

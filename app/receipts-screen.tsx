@@ -23,6 +23,13 @@ export interface ReceiptFile {
   duplicate?: boolean;
   error?: string;
   progress?: number;
+  /** Match info when the matching engine paired this receipt to a transaction. */
+  match?: {
+    vendor: string;
+    date: string;
+    matchType: "exact" | "fuzzy";
+    confidence: number;
+  } | null;
 }
 
 const STATUS_META: Record<
@@ -69,9 +76,21 @@ function formatSize(bytes: number) {
 export function ReceiptImportScreen({
   receipts,
   onUpload,
+  onRetry,
+  onRemove,
+  onClear,
+  aiConfigured = true,
 }: {
   receipts: ReceiptFile[];
   onUpload?: (files: File[]) => void;
+  /** Re-run extraction for one failed receipt. */
+  onRetry?: (id: string) => void;
+  /** Remove one receipt (also clears its match). */
+  onRemove?: (id: string) => void;
+  /** Remove every receipt in the queue (also clears matches). */
+  onClear?: () => void;
+  /** When false, upload is disabled with a "configure AI" hint. */
+  aiConfigured?: boolean;
 }) {
   const [dragActive, setDragActive] = useState(false);
   const bankOnly = useUiStore((s) => s.bankOnly);
@@ -210,6 +229,8 @@ export function ReceiptImportScreen({
                   type="button"
                   className={`${styles.btnPrimary} ${styles.btnAmber}`}
                   onClick={() => inputRef.current?.click()}
+                  disabled={!aiConfigured}
+                  title={!aiConfigured ? "Configure the AI model first" : undefined}
                 >
                   <IconUpload size={15} stroke={2} />
                   Browse files
@@ -273,13 +294,13 @@ export function ReceiptImportScreen({
         <>
           <div
             className={`${styles.dropZone} ${dragActive ? styles.dragover : ""} ${
-              receipts.length >= MAX_FILES ? styles.disabled : ""
+              receipts.length >= MAX_FILES || !aiConfigured ? styles.disabled : ""
             }`}
-            onDragEnter={onDrag}
-            onDragLeave={onDrag}
-            onDragOver={onDrag}
-            onDrop={onDrop}
-            onClick={() => inputRef.current?.click()}
+            onDragEnter={aiConfigured ? onDrag : undefined}
+            onDragLeave={aiConfigured ? onDrag : undefined}
+            onDragOver={aiConfigured ? onDrag : undefined}
+            onDrop={aiConfigured ? onDrop : undefined}
+            onClick={() => aiConfigured && inputRef.current?.click()}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
@@ -373,7 +394,7 @@ export function ReceiptImportScreen({
               <button
                 type="button"
                 className={styles.btnGhostSmall}
-                onClick={() => onUpload?.([])}
+                onClick={() => onClear?.()}
               >
                 Clear queue
               </button>
@@ -381,11 +402,13 @@ export function ReceiptImportScreen({
                 type="button"
                 className={styles.btnSecondary}
                 onClick={() => inputRef.current?.click()}
-                disabled={receipts.length >= MAX_FILES}
+                disabled={receipts.length >= MAX_FILES || !aiConfigured}
                 title={
                   receipts.length >= MAX_FILES
                     ? `Limit reached: ${MAX_FILES} files`
-                    : "Add more receipts"
+                    : !aiConfigured
+                      ? "Configure the AI model first"
+                      : "Add more receipts"
                 }
               >
                 <IconPlus size={14} stroke={1.8} />
@@ -406,7 +429,12 @@ export function ReceiptImportScreen({
 
           <div className={styles.fileList}>
             {receipts.map((r) => (
-              <ReceiptRow key={r.id} receipt={r} />
+              <ReceiptRow
+                key={r.id}
+                receipt={r}
+                onRetry={onRetry}
+                onRemove={onRemove}
+              />
             ))}
           </div>
 
@@ -420,7 +448,15 @@ export function ReceiptImportScreen({
   );
 }
 
-function ReceiptRow({ receipt }: { receipt: ReceiptFile }) {
+function ReceiptRow({
+  receipt,
+  onRetry,
+  onRemove,
+}: {
+  receipt: ReceiptFile;
+  onRetry?: (id: string) => void;
+  onRemove?: (id: string) => void;
+}) {
   const m = STATUS_META[receipt.status];
   const iconCls = receipt.type === "pdf" ? styles.pdf : styles.image;
 
@@ -458,6 +494,16 @@ function ReceiptRow({ receipt }: { receipt: ReceiptFile }) {
         {receipt.status === "failed" && receipt.error && (
           <div className={styles.rxError}>{receipt.error}</div>
         )}
+        {receipt.match ? (
+          <div className={styles.rxMatch}>
+            Matched: {receipt.match.vendor} · {receipt.match.date}
+            {receipt.match.matchType === "fuzzy" && " (fuzzy)"}
+          </div>
+        ) : receipt.status === "extracted" || receipt.status === "needs_review" ? (
+          <div className={styles.rxMatch}>
+            <span className={`${styles.tag} ${styles.amber}`}>Unmatched</span>
+          </div>
+        ) : null}
       </div>
 
       {receipt.status === "processing" && receipt.progress !== undefined && (
@@ -497,11 +543,12 @@ function ReceiptRow({ receipt }: { receipt: ReceiptFile }) {
       </div>
 
       <div className={styles.fileActions}>
-        {(receipt.status === "needs_review" || receipt.status === "failed") && (
+        {receipt.status === "failed" && (
           <button
             type="button"
             className={styles.fileActionBtn}
-            title={receipt.status === "failed" ? "Retry" : "Review fields"}
+            title="Retry"
+            onClick={() => onRetry?.(receipt.id)}
           >
             <IconRefresh size={13} stroke={1.8} />
           </button>
@@ -510,7 +557,7 @@ function ReceiptRow({ receipt }: { receipt: ReceiptFile }) {
           type="button"
           className={`${styles.fileActionBtn} ${styles.danger}`}
           title="Remove"
-          onClick={() => {}}
+          onClick={() => onRemove?.(receipt.id)}
         >
           <IconFileX size={13} stroke={1.8} />
         </button>

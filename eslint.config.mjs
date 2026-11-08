@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // vendored browser assets — never lint minified bundles
+    "public/**",
+    // test fixtures
+    "test-data/**",
   ]),
 ]);
 

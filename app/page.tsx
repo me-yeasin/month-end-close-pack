@@ -13,8 +13,10 @@ import { SettingsScreen } from "./settings-screen";
 import { OverviewScreen } from "./overview-screen";
 import { useAiStore, loadAiConfig } from "./ai-store";
 import { useImportStore } from "./import-store";
+import { useReceiptStore } from "./receipt-store";
 import { buildSummary } from "./summary";
 import { buildExportPack, type PackPreset } from "./export-pack";
+import { autoMatch } from "./matching";
 import { useUiStore } from "./ui-store";
 import { MonthPicker } from "./month-picker";
 import { AddFilesModal } from "./add-files-modal";
@@ -87,20 +89,44 @@ export default function Home() {
   const startImport = useImportStore((state) => state.startImport);
   const resolveTransactions = useImportStore((state) => state.resolveTransactions);
   const setCategory = useImportStore((state) => state.setCategory);
+  const setTransactionMatch = useImportStore((state) => state.setTransactionMatch);
+
+  // Receipt pipeline state
+  const receiptRecords = useReceiptStore((state) => state.receipts);
+  const hydrateReceipts = useReceiptStore((state) => state.hydrate);
+  const addReceiptFiles = useReceiptStore((state) => state.addFiles);
+  const retryReceipt = useReceiptStore((state) => state.retry);
+  const removeReceipt = useReceiptStore((state) => state.remove);
+  const clearReceipts = useReceiptStore((state) => state.clear);
+  const setReceiptMatch = useReceiptStore((state) => state.setReceiptMatch);
+
   const activeAiProvider =
     aiProviders.find((p) => p.id === aiActiveProviderId) ?? null;
 
-  const handleAddFiles = (bankFiles: File[]) => {
-    if (!workspace || !activeAiProvider || !aiActiveModelId) return;
-    void startImport(
-      bankFiles,
-      { id: workspace.id, month: workspace.month, year: workspace.year },
-      {
-        baseUrl: activeAiProvider.baseUrl,
-        apiKey: activeAiProvider.apiKey,
-        model: aiActiveModelId,
-      },
-    );
+  const handleAddFiles = (bankFiles: File[], receiptFiles: File[]) => {
+    if (!workspace) return;
+    if (bankFiles.length > 0 && activeAiProvider && aiActiveModelId) {
+      void startImport(
+        bankFiles,
+        { id: workspace.id, month: workspace.month, year: workspace.year },
+        {
+          baseUrl: activeAiProvider.baseUrl,
+          apiKey: activeAiProvider.apiKey,
+          model: aiActiveModelId,
+        },
+      );
+    }
+    if (receiptFiles.length > 0 && activeAiProvider && aiActiveModelId) {
+      void addReceiptFiles(
+        receiptFiles,
+        { id: workspace.id, month: workspace.month, year: workspace.year },
+        {
+          baseUrl: activeAiProvider.baseUrl,
+          apiKey: activeAiProvider.apiKey,
+          model: aiActiveModelId,
+        },
+      );
+    }
   };
 
   // Close the month picker when clicking outside the trigger + popover
@@ -144,11 +170,26 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load the active month's imported transactions + latest job.
+  // Load the active month's imported transactions, receipts + latest job.
   useEffect(() => {
     if (!workspace) return;
     void hydrateImport(workspace.id, workspace.month, workspace.year);
-  }, [workspace?.id, workspace?.month, workspace?.year, hydrateImport]);
+    void hydrateReceipts(workspace.id, workspace.month, workspace.year);
+  }, [workspace?.id, workspace?.month, workspace?.year, hydrateImport, hydrateReceipts]);
+
+  // Auto-match extracted receipts to bank transactions. Idempotent: matched
+  // pairs are excluded, so the effect converges after applying its changes.
+  useEffect(() => {
+    if (!workspace) return;
+    const suggestions = autoMatch(receiptRecords, importTransactions);
+    if (suggestions.length === 0) return;
+    void (async () => {
+      for (const s of suggestions) {
+        await setReceiptMatch(s.receiptId, s.transactionId, s.matchType, s.confidence);
+        await setTransactionMatch(s.transactionId, s.receiptId);
+      }
+    })();
+  }, [receiptRecords, importTransactions, workspace, setReceiptMatch, setTransactionMatch]);
 
   // Bank-only mode hides the Receipts view — bounce the user out if they're on it.
   useEffect(() => {
@@ -225,10 +266,36 @@ export default function Home() {
   ).length;
   const flaggedCount = reviewExceptions.length;
 
+  // receipt view models — match info resolved against the transaction ledger
+  const txById = new Map(importTransactions.map((t) => [t.id, t]));
+  const receiptRows = receiptRecords.map((r) => {
+    const matchedTx = r.matchId ? txById.get(r.matchId) : undefined;
+    return {
+      id: r.id,
+      name: r.originalName,
+      type: (r.mimeType === "application/pdf" ? "pdf" : "image") as "pdf" | "image",
+      size: r.size,
+      status: r.status,
+      pages: r.pageCount,
+      duplicate: r.duplicate,
+      error: r.error,
+      match:
+        matchedTx && r.matchType
+          ? {
+              vendor: matchedTx.description,
+              date: formatTxDate(matchedTx.date),
+              matchType: r.matchType,
+              confidence: r.matchConfidence ?? 0,
+            }
+          : null,
+    };
+  });
+
   const monthSummary = buildSummary(
     importTransactions,
     formatPeriodLong({ month: workspace.month, year: workspace.year }),
     workspace.currency,
+    receiptRecords,
   );
 
   // Build the accountant pack ZIP in the browser and save it locally.
@@ -236,6 +303,32 @@ export default function Home() {
     preset: PackPreset,
   ): Promise<string | void> => {
     if (!workspace) return;
+    // include receipts under receipts/, renamed by date, vendor and amount
+    const packReceipts = receiptRecords
+      .filter(
+        (r) =>
+          !r.duplicate &&
+          (r.status === "extracted" || r.status === "needs_review"),
+      )
+      .map((r) => {
+        const ext = r.mimeType.includes("pdf")
+          ? "pdf"
+          : r.mimeType.includes("png")
+            ? "png"
+            : "jpg";
+        const vendor = (r.extracted?.vendor.value || "receipt")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 40);
+        const date = r.extracted?.date.value || r.createdAt.slice(0, 10);
+        const total = r.extracted?.total.value?.toFixed(2) ?? "0.00";
+        return {
+          name: `${date}-${vendor}-${total}.${ext}`,
+          data: r.blob,
+        };
+      });
+
     const result = await buildExportPack({
       preset,
       transactions: importTransactions,
@@ -248,6 +341,7 @@ export default function Home() {
       }),
       monthId: `${workspace.year}-${String(workspace.month + 1).padStart(2, "0")}`,
       currency: workspace.currency,
+      receipts: packReceipts,
     });
     return result.fileName;
   };
@@ -428,10 +522,32 @@ export default function Home() {
 
           {view === "receipts" && (
             <ReceiptImportScreen
-              receipts={[]}
-              onUpload={() => {
-                /* will wire to real import later */
+              receipts={receiptRows}
+              aiConfigured={aiConfigured}
+              onUpload={(files) => {
+                if (activeAiProvider && aiActiveModelId && workspace) {
+                  void addReceiptFiles(
+                    files,
+                    { id: workspace.id, month: workspace.month, year: workspace.year },
+                    {
+                      baseUrl: activeAiProvider.baseUrl,
+                      apiKey: activeAiProvider.apiKey,
+                      model: aiActiveModelId,
+                    },
+                  );
+                }
               }}
+              onRetry={(id) => {
+                if (activeAiProvider && aiActiveModelId) {
+                  void retryReceipt(id, {
+                    baseUrl: activeAiProvider.baseUrl,
+                    apiKey: activeAiProvider.apiKey,
+                    model: aiActiveModelId,
+                  });
+                }
+              }}
+              onRemove={(id) => void removeReceipt(id)}
+              onClear={() => void clearReceipts()}
             />
           )}
 
@@ -471,12 +587,14 @@ export default function Home() {
         </div>
       </main>
 
-      <AddFilesModal
-        open={addFilesOpen}
-        onClose={() => setAddFilesOpen(false)}
-        onAdd={handleAddFiles}
-        mode={addFilesMode}
-      />
+      {/* the modal mounts only while open, so its state resets naturally */}
+      {addFilesOpen && (
+        <AddFilesModal
+          onClose={() => setAddFilesOpen(false)}
+          onAdd={handleAddFiles}
+          mode={addFilesMode}
+        />
+      )}
     </div>
   );
 }
